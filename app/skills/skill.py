@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from glob import glob
 from pathlib import Path
-from typing import Self, Any
+from typing import Self
 
+from app.schemas import ToolSchema
 from app.tools.base_tool import Tool
 
 
@@ -58,12 +59,11 @@ class SkillsTool(Tool):
     )
     args = {"skill_name": "string"}
 
-    def make_schema(self, name: str) -> dict[str, Any]:
-        return {
-            "type": "function",
-            "name": name,
-            "description": self.description,
-            "parameters": {
+    def make_schema(self, name: str) -> ToolSchema:
+        return ToolSchema(
+            name=name,
+            description=self.description,
+            parameters={
                 "type": "object",
                 "properties": {
                     "skill_name": {
@@ -74,7 +74,7 @@ class SkillsTool(Tool):
                 },
                 "required": ["skill_name"],
             },
-        }
+        )
 
     def __call__(self, args) -> str:
         try:

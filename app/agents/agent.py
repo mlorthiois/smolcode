@@ -1,8 +1,9 @@
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 from app.provider import call_api
+from app.schemas import Input, ToolSchema
 from app.skills.skill import SkillsTool
 from app.tools.base_tool import Tool
 from app.tools.bash import BashTool
@@ -21,12 +22,17 @@ class Agent:
     tools: dict[str, Tool]
 
     def __post_init__(self):
-        self.tools_schema = []
+        self.tools_schema: list[ToolSchema] = []
         for tool_name, tool in self.tools.items():
             self.tools_schema.append(tool.make_schema(tool_name))
 
-    def call(self, messages):
-        return call_api(messages, self.model, self.instructions, self.tools_schema)
+    def call(self, messages: list[Input]):
+        return call_api(
+            messages,
+            self.model,
+            self.instructions,
+            self.tools_schema,
+        )
 
 
 agent = Agent(
@@ -37,11 +43,11 @@ agent = Agent(
     tools={
         "read": ReadTool(),
         "glob": GlobTool(),
-        "skills": SkillsTool(),
         "bash": BashTool(),
         "grep": GrepTool(),
         "edit": EditTool(),
         "write": WriteTool(),
         "webfetch": WebFetchTool(),
+        "skills": SkillsTool(),
     },
 )

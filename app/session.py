@@ -1,8 +1,9 @@
-from typing import Any
 import json
 from dataclasses import dataclass, field
+from typing import cast
 
 from app.agents import Agent
+from app.schemas import FunctionCall, FunctionCallOutput, Input, Message
 from app.ui import (
     RED,
     RESET,
@@ -17,7 +18,7 @@ from app.ui import (
 @dataclass
 class Session:
     agent: Agent
-    messages: list = field(default_factory=list)
+    messages: list[Input] = field(default_factory=list)
 
     @ui_input
     def get_user_input(self):
@@ -33,23 +34,27 @@ class Session:
             self.messages = []
             return
 
-        self.messages.append({"role": "user", "content": user_input})
+        self.messages.append(Message(role="user", content=user_input))
 
     @ui_text
     def extract_text(self, block) -> str:
         return block["content"][0]["text"]
 
     @ui_tool_extract
-    def extract_tool(self, block) -> tuple[str, dict[str, Any]]:
-        tool_name = block["name"]
-        tool_args = json.loads(block.get("arguments", "{}"))
-        return tool_name, tool_args
+    def extract_tool(self, block) -> FunctionCall:
+        function_call = FunctionCall(
+            call_id=block["call_id"],
+            name=block["name"],
+            arguments=block.get("arguments", "{}"),
+        )
+        return function_call
 
     @ui_tool_result
-    def run_tool(self, name, args) -> str:
+    def run_tool(self, function_call: FunctionCall) -> FunctionCallOutput | str:
+        args = json.loads(function_call.arguments)
         try:
-            tool_output = self.agent.tools[name](args)
-            return tool_output
+            tool_output = self.agent.tools[function_call.name](args)
+            return FunctionCallOutput(call_id=function_call.call_id, output=tool_output)
         except Exception as err:
             return f"error: {err}"
 
@@ -57,24 +62,20 @@ class Session:
         while True:
             response = self.agent.call(self.messages)
             response_output = response["output"]
-            self.messages += response_output
 
             for block in response_output:
                 if block["type"] == "message":
-                    self.extract_text(block)
+                    content = self.extract_text(block)
+                    self.messages.append(Message(role="assistant", content=content))
                     return
 
                 if block["type"] == "function_call":
-                    tool_name, tool_args = self.extract_tool(block)
-                    result = self.run_tool(tool_name, tool_args)
-
-                    self.messages.append(
-                        {
-                            "type": "function_call_output",
-                            "call_id": block["call_id"],
-                            "output": result,
-                        }
-                    )
+                    function_call = self.extract_tool(block)
+                    function_call_output = self.run_tool(function_call)
+                    self.messages += [
+                        cast("Input", function_call),
+                        cast("Input", function_call_output),
+                    ]
 
         return
 
