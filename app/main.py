@@ -1,9 +1,8 @@
-from app.agents import agent
 from app.session import Session
 
 
 def main():
-    session = Session(agent=agent)
+    session = Session(agent="plan")
     session.start()
 
 

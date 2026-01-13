@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import Any, Literal
 
+Action = Literal["nothing", "conversation", "clear", "switch_agent"]
+
 
 @dataclass
 class ToolSchema:

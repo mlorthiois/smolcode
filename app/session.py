@@ -1,9 +1,9 @@
 import json
 from dataclasses import dataclass, field
-from typing import cast
+from typing import cast, get_args
 
-from app.agents import Agent
-from app.schemas import FunctionCall, FunctionCallOutput, Input, Message
+from app.agents import AGENTS, Agent, AgentName
+from app.schemas import Action, FunctionCall, FunctionCallOutput, Input, Message
 from app.ui import (
     RED,
     RESET,
@@ -17,24 +17,46 @@ from app.ui import (
 
 @dataclass
 class Session:
-    agent: Agent
+    agent: AgentName
     messages: list[Input] = field(default_factory=list)
 
+    def get_agent(self) -> Agent:
+        return AGENTS[self.agent]
+
     @ui_input
-    def get_user_input(self):
+    def get_user_input(self) -> Action:
         user_input = input().strip()
 
         if not user_input:
-            return
+            return "nothing"
+
+        if user_input.startswith("/agent"):
+            user_input_splitted = user_input.split(" ")
+            if len(user_input_splitted) > 2:
+                raise RuntimeError(
+                    f"Command format error. Pick from {get_args(AgentName)} and follow this strict format: `/agent {{agent_name}}`"
+                )
+
+            agent_name = user_input_splitted[1].lower()
+            if agent_name == self.agent:
+                return "nothing"
+
+            if agent_name not in get_args(AgentName):
+                raise RuntimeError(
+                    f"{agent_name} not a valid agent. Pick from {get_args(AgentName)} and follow this strict format: `/agent {{agent_name}}`"
+                )
+            self.agent = cast("AgentName", agent_name)
+            return "switch_agent"
 
         if user_input in ("/q", "/quit", "exit"):
             exit()
 
         if user_input in ("/c", "/clear"):
             self.messages = []
-            return
+            return "clear"
 
         self.messages.append(Message(role="user", content=user_input))
+        return "conversation"
 
     @ui_text
     def extract_text(self, block) -> str:
@@ -53,21 +75,24 @@ class Session:
     def run_tool(self, function_call: FunctionCall) -> FunctionCallOutput | str:
         args = json.loads(function_call.arguments)
         try:
-            tool_output = self.agent.tools[function_call.name](args)
+            tool_output = self.get_agent().tools[function_call.name](args)
             return FunctionCallOutput(call_id=function_call.call_id, output=tool_output)
         except Exception as err:
             return f"error: {err}"
 
     def step(self):
         while True:
-            response = self.agent.call(self.messages)
+            response = self.get_agent().call(self.messages)
             response_output = response["output"]
 
-            for block in response_output:
+            for i, block in enumerate(response_output):
                 if block["type"] == "message":
                     content = self.extract_text(block)
                     self.messages.append(Message(role="assistant", content=content))
-                    return
+
+                    # If ends with text, stop the loop
+                    if i == len(response_output) - 1:
+                        return
 
                 if block["type"] == "function_call":
                     function_call = self.extract_tool(block)
@@ -77,15 +102,18 @@ class Session:
                         cast("Input", function_call_output),
                     ]
 
+                print()
+
         return
 
     @ui_header
     def start(self):
         while True:
             try:
-                self.get_user_input()
+                user_action = self.get_user_input()
+                if user_action != "conversation":
+                    continue
                 self.step()
-                print()
             except (KeyboardInterrupt, EOFError):
                 break
             except Exception as err:

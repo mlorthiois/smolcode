@@ -4,7 +4,7 @@ import re
 from collections.abc import Callable
 from typing import ParamSpec, TypeVar, Union
 
-from app.schemas import FunctionCall, FunctionCallOutput
+from app.schemas import Action, FunctionCall, FunctionCallOutput
 
 RESET, BOLD, DIM, BLUE, CYAN, GREEN, YELLOW, RED = (
     "\033[0m",
@@ -38,7 +38,7 @@ def render_markdown(text) -> str:
 
 def ui_header(func: Callable[..., str]):
     def myinner(*args, **kwargs):
-        agent = args[0].agent
+        agent = args[0].get_agent()
         os.system("clear||cls")  # Clear the terminal to be in "fullscreen"
         print(separator())
         print(HEADER)
@@ -55,17 +55,31 @@ def ui_header(func: Callable[..., str]):
     return myinner
 
 
-def ui_input(func: Callable[..., None]) -> Callable[..., None]:
-    def myinner(*args, **kwargs):
+def ui_input(func: Callable[..., Action]) -> Callable[..., Action]:
+    def myinner(*args, **kwargs) -> Action:
+        session = args[0]
+        agent_name = session.agent.title()
         print(separator())
-        print(f"{BOLD}{BLUE}❯{RESET} ", end="")
+        print(f"{BOLD}{BLUE}({agent_name}) ❯{RESET} ", end="")
 
-        user_input = func(*args, **kwargs)
-        if user_input == "/c":
+        user_action = func(*args, **kwargs)
+
+        if user_action == "nothing":
+            return user_action
+
+        print(separator())
+
+        if user_action == "conversation":
+            return user_action
+
+        if user_action == "clear":
             print(f"{GREEN}⏺ Cleared conversation{RESET}")
+            return user_action
 
-        print(separator())
-        return user_input
+        if user_action == "switch_agent":
+            print(f"{GREEN}⏺ Agent switched{RESET}")
+
+        return user_action
 
     return myinner
 
@@ -73,7 +87,7 @@ def ui_input(func: Callable[..., None]) -> Callable[..., None]:
 def ui_text(func: Callable[P, str]) -> Callable[P, str]:
     def myinner(*args, **kwargs):
         text = func(*args, **kwargs)
-        print(f"\n{CYAN}⏺{RESET} {render_markdown(text)}")
+        print(f"{CYAN}⏺{RESET} {render_markdown(text)}")
         return text
 
     return myinner
@@ -89,7 +103,7 @@ def ui_tool_extract(func: Callable[P, FunctionCall]) -> Callable[P, FunctionCall
             arg_preview = str(list(args.values())[0])
             if len(arg_preview) > 70:
                 arg_preview = arg_preview[:70]
-        print(f"\n{GREEN}⏺ {tool.name.capitalize()}{RESET}({DIM}{arg_preview}{RESET})")
+        print(f"{GREEN}⏺ {tool.name.capitalize()}{RESET}({DIM}{arg_preview}{RESET})")
         return tool
 
     return myinner
