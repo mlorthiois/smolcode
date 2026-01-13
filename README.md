@@ -8,16 +8,13 @@ It runs a simple chat loop, lets the model call a small set of local tools (read
 
 ```
 ────────────────────────────────────────────────────────────────────────────────────────────
-                     _               _
- ___ _ __ ___   ___ | | ___ ___   __| | ___
-/ __| '_ ` _ \ / _ \| |/ __/ _ \ / _` |/ _ \
-\__ \ | | | | | (_) | | (_| (_) | (_| |  __/
-|___/_| |_| |_|\___/|_|\___\___/ \__,_|\___|
-
 ────────────────────────────────────────────────────────────────────────────────────────────
-Model: gpt-5.2
-Skills loaded: 2 (code-review, python-best-practices)
-Tools loaded: 8 (read, glob, skills, bash, grep, edit, write, webfetch)
+>                           | Dir:    /Users/mlorthiois/Developer/smolcode
+>  ┏━┓┏┳┓┏━┓╻  ┏━╸┏━┓╺┳┓┏━╸ | Branch: main
+>  ┗━┓┃┃┃┃ ┃┃  ┃  ┃ ┃ ┃┃┣╸  | Model:  gpt-5.2
+>  ┗━┛╹ ╹┗━┛┗━╸┗━╸┗━┛╺┻┛┗━╸ | Tools:  read, glob, bash, grep, webfetch, skills
+>                           | Skills: code-review, python-best-practices
+────────────────────────────────────────────────────────────────────────────────────────────
 ────────────────────────────────────────────────────────────────────────────────────────────
 (Build) ❯ Write the documentation for this repo in the README.md file. 
 You must include the features offered by this tool (in broad terms, do not list their

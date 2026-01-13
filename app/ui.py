@@ -1,10 +1,15 @@
 import json
 import os
 import re
+import shutil
+import subprocess
+import sys
 from collections.abc import Callable
-from typing import ParamSpec, TypeVar, Union
+from dataclasses import dataclass
+from functools import wraps
+from typing import ParamSpec, Self, TextIO, TypeVar
 
-from app.schemas import Action, FunctionCall, FunctionCallOutput
+from app.schemas import FunctionCall, FunctionCallOutput, UserInputResult
 
 RESET, BOLD, DIM, BLUE, CYAN, GREEN, YELLOW, RED = (
     "\033[0m",
@@ -17,129 +22,264 @@ RESET, BOLD, DIM, BLUE, CYAN, GREEN, YELLOW, RED = (
     "\033[31m",
 )
 
-HEADER = r"""                     _               _      
- ___ _ __ ___   ___ | | ___ ___   __| | ___ 
-/ __| '_ ` _ \ / _ \| |/ __/ _ \ / _` |/ _ \
-\__ \ | | | | | (_) | | (_| (_) | (_| |  __/
-|___/_| |_| |_|\___/|_|\___\___/ \__,_|\___|
-"""
+HEADER = r"""
+>                          | Dir:    {pwd}
+> ┏━┓┏┳┓┏━┓╻  ┏━╸┏━┓╺┳┓┏━╸ | Branch: {branch}
+> ┗━┓┃┃┃┃ ┃┃  ┃  ┃ ┃ ┃┃┣╸  | Model:  {model} 
+> ┗━┛╹ ╹┗━┛┗━╸┗━╸┗━┛╺┻┛┗━╸ | Tools:  {tools} 
+>                          | Skills: {skills}
+""".strip()
 
 P = ParamSpec("P")
 R = TypeVar("R")
 
 
-def separator() -> str:
-    return f"{DIM}{'─' * min(os.get_terminal_size().columns, 100)}{RESET}"
+# -------------------------------------------------------------------------
+# Events
+# -------------------------------------------------------------------------
+@dataclass(frozen=True, slots=True)
+class HeaderEvent:
+    model: str
+    skills: tuple[str, ...]
+    tools: tuple[str, ...]
+    pwd: str = os.getcwd()
+    branch: str = subprocess.run(
+        ["git", "branch", "--show-current"], capture_output=True, text=True
+    ).stdout.strip()
 
 
-def render_markdown(text) -> str:
-    return re.sub(r"\*\*(.+?)\*\*", f"{BOLD}\\1{RESET}", text)
+@dataclass(frozen=True, slots=True)
+class PromptEvent:
+    agent_name: str
 
 
-def ui_header(func: Callable[..., str]):
-    def myinner(*args, **kwargs):
-        agent = args[0].get_agent()
-        os.system("clear||cls")  # Clear the terminal to be in "fullscreen"
-        print(separator())
-        print(HEADER)
-        print(separator())
-        skills_schema = agent.tools["skills"].make_schema("skills")
-        skills = skills_schema.parameters["properties"]["skill_name"]["enum"]
-        print(f"Model: {agent.model}")
-        print(f"Skills loaded: {len(skills)} ({', '.join(list(skills))})")
-        print(
-            f"Tools loaded: {len(agent.tools_schema)} ({', '.join([tool.name for tool in agent.tools_schema])})"
-        )
-        _ = func(*args, **kwargs)
-
-    return myinner
+@dataclass(frozen=True, slots=True)
+class TextEvent:
+    text: str
 
 
-def ui_input(func: Callable[..., Action]) -> Callable[..., Action]:
-    def myinner(*args, **kwargs) -> Action:
-        session = args[0]
-        agent_name = session.agent.title()
-        print(separator())
-        print(f"{BOLD}{BLUE}({agent_name}) ❯{RESET} ", end="")
+@dataclass(frozen=True, slots=True)
+class ToolCallEvent:
+    name: str
+    arg_preview: str
 
-        user_action = func(*args, **kwargs)
+    @classmethod
+    def from_function_call(cls, call: FunctionCall) -> Self:
+        try:
+            parsed = json.loads(call.arguments)
+        except json.JSONDecodeError:
+            return cls(name=call.name, arg_preview="(invalid json)")
 
-        if user_action == "nothing":
-            return user_action
-
-        print(separator())
-
-        if user_action == "conversation":
-            return user_action
-
-        if user_action == "clear":
-            print(f"{GREEN}⏺ Cleared conversation{RESET}")
-            return user_action
-
-        if user_action == "switch_agent":
-            print(f"{GREEN}⏺ Agent switched{RESET}")
-
-        return user_action
-
-    return myinner
-
-
-def ui_text(func: Callable[P, str]) -> Callable[P, str]:
-    def myinner(*args, **kwargs):
-        text = func(*args, **kwargs)
-        print(f"{CYAN}⏺{RESET} {render_markdown(text)}")
-        return text
-
-    return myinner
-
-
-def ui_tool_extract(func: Callable[P, FunctionCall]) -> Callable[P, FunctionCall]:
-    def myinner(*args: P.args, **kwargs: P.kwargs) -> FunctionCall:
-        tool = func(*args, **kwargs)
-        args = json.loads(tool.arguments)
-        if len(args) == 0:
-            arg_preview = ""
-        else:
-            arg_preview = str(list(args.values())[0])
+        arg_preview = ""
+        if isinstance(parsed, dict) and parsed:
+            first_value = next(iter(parsed.values()))
+            arg_preview = str(first_value)
             if len(arg_preview) > 70:
                 arg_preview = arg_preview[:70]
-        print(f"{GREEN}⏺ {tool.name.capitalize()}{RESET}({DIM}{arg_preview}{RESET})")
-        return tool
 
-    return myinner
+        return cls(name=call.name, arg_preview=arg_preview)
 
 
-def ui_tool_result(
-    func: Callable[P, Union[FunctionCallOutput, str]],
-) -> Callable[P, Union[FunctionCallOutput, str]]:
-    def myinner(*args, **kwargs):
-        result = func(*args, **kwargs)
-        if isinstance(result, FunctionCallOutput):
-            result_str = result.output
-        else:
-            result_str = result
+@dataclass(frozen=True, slots=True)
+class ToolResultEvent:
+    preview: tuple[str, ...]
+    remaining_lines: int
+
+    @classmethod
+    def from_function_call_output(cls, result: FunctionCallOutput | str) -> Self:
+        result_str = result.output if isinstance(result, FunctionCallOutput) else result
 
         result_lines = result_str.split("\n")
-        for i, line in enumerate(result_lines):
-            if i > 2:
-                break
-
+        preview: list[str] = []
+        for line in result_lines[:3]:
             if len(line) > 80:
                 line = line[:77] + "..."
-
             if len(line) == 0:
                 line = "(No content)"
+            preview.append(line)
 
-            if i == 0:
-                prefix = "  ⎿ "
+        remaining_lines = max(len(result_lines) - 3, 0)
+        return cls(preview=tuple(preview), remaining_lines=remaining_lines)
+
+
+# -------------------------------------------------------------------------
+# TUI
+# -------------------------------------------------------------------------
+class TerminalUI:
+    def __init__(self, out: TextIO | None = None) -> None:
+        self._out = out if out is not None else sys.stdout
+
+    def _terminal_width(self, out: TextIO) -> int:
+        size = shutil.get_terminal_size(fallback=(100, 20))
+        return min(size.columns, 100)
+
+    def _separator(self, out: TextIO) -> str:
+        return f"{DIM}{'─' * self._terminal_width(out)}{RESET}"
+
+    def print(self, text: str) -> None:
+        self._out.write(text)
+
+    def error(self, event: TextEvent) -> None:
+        self.print(f"{RED}⏺ Error: {event.text}{RESET}\n")
+
+    def newline(self) -> None:
+        self.print("\n")
+
+    def separator_line(self) -> None:
+        self.print(self._separator(self._out) + "\n")
+
+    def _clear_screen_if_tty(self, out: TextIO) -> None:
+        if not out.isatty():
+            return
+        # ANSI clear screen + cursor home
+        self.print("\033[2J\033[H")
+
+    def render_markdown(self, text: str) -> str:
+        return re.sub(r"\*\*(.+?)\*\*", f"{BOLD}\\1{RESET}", text)
+
+    def header(self, event: HeaderEvent) -> None:
+        self._clear_screen_if_tty(self._out)
+        self.separator_line()
+        self.separator_line()
+
+        self.print(
+            HEADER.format(
+                pwd=event.pwd,
+                branch=event.branch,
+                model=event.model,
+                tools=", ".join(event.tools),
+                skills=", ".join(event.skills),
+            )
+            + "\n"
+        )
+        self.separator_line()
+
+    def prompt(self, event: PromptEvent) -> None:
+        self.print(self._separator(self._out) + "\n")
+        self.print(f"{BOLD}{BLUE}({event.agent_name}) ❯{RESET} ")
+        self._out.flush()
+
+    def text(self, event: TextEvent) -> None:
+        self.print(f"{CYAN}⏺{RESET} {self.render_markdown(event.text)}\n")
+
+    def status(self, event: TextEvent) -> None:
+        self.print(f"{GREEN}⏺ {self.render_markdown(event.text)}{RESET}\n")
+
+    def tool_call(self, event: ToolCallEvent) -> None:
+        self.print(
+            f"{GREEN}⏺ {event.name.capitalize()}{RESET}({DIM}{event.arg_preview}{RESET})\n"
+        )
+
+    def tool_result(self, event: ToolResultEvent) -> None:
+        for i, line in enumerate(event.preview):
+            prefix = "  ⎿ " if i == 0 else "    "
+            self.print(f"{DIM}{prefix}{line}{RESET}\n")
+
+        if event.remaining_lines > 0:
+            self.print(f"{DIM}    ... +{event.remaining_lines} lines{RESET}\n")
+
+
+# -------------------------------------------------------------------------
+# TUI API
+# -------------------------------------------------------------------------
+_UI: TerminalUI | None = None
+
+
+def require_ui() -> TerminalUI:
+    if _UI is None:
+        raise RuntimeError("UI not initialized (did you call Session.start()?)")
+    return _UI
+
+
+def set_ui(ui: TerminalUI) -> None:
+    global _UI
+    _UI = ui
+
+
+def clear_ui() -> None:
+    global _UI
+    _UI = None
+
+
+# -------------------------------------------------------------------------
+# Expose TUI API to session
+# -------------------------------------------------------------------------
+def ui_header(
+    event_factory: Callable[P, HeaderEvent],
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+        @wraps(func)
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            require_ui().header(event_factory(*args, **kwargs))
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def ui_prompt(
+    event_factory: Callable[P, PromptEvent],
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+        @wraps(func)
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            require_ui().prompt(event_factory(*args, **kwargs))
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def ui_user_input(func: Callable[P, UserInputResult]) -> Callable[P, UserInputResult]:
+    @wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> UserInputResult:
+        result = func(*args, **kwargs)
+
+        if result.action != "nothing":
+            ui = require_ui()
+            ui.separator_line()
+
+        if result.feedback is not None:
+            ui = require_ui()
+            if result.action in ("clear", "switch_agent"):
+                ui.status(TextEvent(result.feedback))
             else:
-                prefix = "    "
-
-            print(f"{DIM}{prefix}{line}{RESET}")
-
-        if len(result_lines) > 3:
-            print(f"{DIM}    ... +{max(len(result_lines) - 3, 0)} lines{RESET}")
+                ui.text(TextEvent(result.feedback))
 
         return result
 
-    return myinner
+    return wrapper
+
+
+def ui_text(func: Callable[P, str]) -> Callable[P, str]:
+    @wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> str:
+        text = func(*args, **kwargs)
+        require_ui().text(TextEvent(text))
+        return text
+
+    return wrapper
+
+
+def ui_tool_extract(func: Callable[P, FunctionCall]) -> Callable[P, FunctionCall]:
+    @wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> FunctionCall:
+        tool = func(*args, **kwargs)
+        require_ui().tool_call(ToolCallEvent.from_function_call(tool))
+        return tool
+
+    return wrapper
+
+
+def ui_tool_result(
+    func: Callable[P, FunctionCallOutput | str],
+) -> Callable[P, FunctionCallOutput | str]:
+    @wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> FunctionCallOutput | str:
+        result = func(*args, **kwargs)
+        require_ui().tool_result(ToolResultEvent.from_function_call_output(result))
+        return result
+
+    return wrapper

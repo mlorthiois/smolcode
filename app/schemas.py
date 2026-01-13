@@ -4,6 +4,12 @@ from typing import Any, Literal
 Action = Literal["nothing", "conversation", "clear", "switch_agent"]
 
 
+@dataclass(frozen=True, slots=True)
+class UserInputResult:
+    action: Action
+    feedback: str | None = None
+
+
 @dataclass
 class ToolSchema:
     name: str
