@@ -69,6 +69,9 @@ class Session:
             self.messages = []
             return UserInputResult(action="clear", feedback="Cleared conversation")
 
+        if user_input.startswith("/"):
+            return UserInputResult(action="nothing")
+
         self.messages.append(Message(role="user", content=user_input))
         return UserInputResult(action="conversation")
 
@@ -98,17 +101,15 @@ class Session:
         while True:
             response = self.get_agent().call(self.messages)
             response_output = response["output"]
+            has_tool = False
 
             for i, block in enumerate(response_output):
                 if block["type"] == "message":
                     content = self.extract_text(block)
                     self.messages.append(Message(role="assistant", content=content))
 
-                    # If ends with text, stop the loop
-                    if i == len(response_output) - 1:
-                        return
-
                 if block["type"] == "function_call":
+                    has_tool = True
                     function_call = self.extract_tool(block)
                     function_call_output = self.run_tool(function_call)
                     self.messages += [
@@ -118,7 +119,9 @@ class Session:
 
                 require_ui().newline()
 
-        return
+            # if no tool output to send back to the model, break the model loop
+            if not has_tool:
+                return
 
     def start(self) -> None:
         ui = TerminalUI()

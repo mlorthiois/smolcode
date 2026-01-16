@@ -15,7 +15,7 @@ plan_instructions = (Path(__file__).parent / "prompt" / "plan.txt").read_text()
 instructions = base_instructions + plan_instructions
 
 agent = Agent(
-    model="gpt-5.2",
+    model="gpt-5.2-codex",
     instructions=instructions.format(path=os.getcwd()),
     tools={
         "read": ReadTool(),

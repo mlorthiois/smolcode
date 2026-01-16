@@ -61,13 +61,13 @@ class Session:
     def step(self) -> None:
         while True:
             response = self.get_agent().call(self.messages)
+            has_tool = False
             
             for block in response["output"]:
                 if block["type"] == "message":
-                    # LLM responded with text - we're done
+                    # LLM responded with text - print it
                     content = block["content"][0]["text"]
                     self.messages.append(Message(role="assistant", content=content))
-                    return
                 
                 if block["type"] == "function_call":
                     # LLM wants to use a tool - execute it
@@ -77,9 +77,16 @@ class Session:
                         arguments=block.get("arguments", "{}"),
                     )
                     result = self.run_tool(function_call)
+
+                    # Remember tool output should be sent back to the model
+                    has_tool = True
                     
                     # Add both the call and result to history
                     self.messages += [function_call, result]
+
+            # if no tool output to send back to the model, break the model loop
+            if not has_tool:
+                return
 ```
 
 ### 2. The Agent
