@@ -1,5 +1,5 @@
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterator
 
 from app.context import Context
@@ -10,6 +10,7 @@ from app.schemas import (
     Message,
     ToolSchema,
 )
+from app.tools import TOOLS
 from app.tools.base_tool import Tool
 from app.ui import (
     require_ui,
@@ -20,12 +21,17 @@ from app.ui import (
 class Agent:
     model: str
     instructions: str
-    tools: dict[str, Tool]
+    tool_names: list[str] = field(default_factory=list)
 
     def __post_init__(self):
+        self.tools: dict[str, Tool] = {}
         self.tools_schema: list[ToolSchema] = []
-        for tool_name, tool in self.tools.items():
-            self.tools_schema.append(tool.make_schema(tool_name))
+
+        for name in self.tool_names:
+            if name in TOOLS:
+                tool = TOOLS[name]
+                self.tools[name] = tool
+                self.tools_schema.append(tool.make_schema(name))
 
     def _call(self, context: Context):
         return call_api(

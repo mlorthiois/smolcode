@@ -4,76 +4,10 @@ A minimal, no-dependency, hackable CLI coding agent.
 
 It runs a simple chat loop, lets the model call a small set of local tools (read files, search, run shell commands, edit files), and supports “skills” as reusable instruction packs.
 
+> [!TIP]
 > See [LEARN.md](./LEARN.md) to learn more about AI coding agents.
 
-## Example of conversation
-
-```
-────────────────────────────────────────────────────────────────────────────────────────────
-────────────────────────────────────────────────────────────────────────────────────────────
->                           | Dir:    /Users/mlorthiois/Developer/smolcode
->  ┏━┓┏┳┓┏━┓╻  ┏━╸┏━┓╺┳┓┏━╸ | Branch: main
->  ┗━┓┃┃┃┃ ┃┃  ┃  ┃ ┃ ┃┃┣╸  | Model:  gpt-5.2
->  ┗━┛╹ ╹┗━┛┗━╸┗━╸┗━┛╺┻┛┗━╸ | Tools:  read, glob, bash, grep, webfetch, skills
->                           | Skills: code-review, python-best-practices
-────────────────────────────────────────────────────────────────────────────────────────────
-────────────────────────────────────────────────────────────────────────────────────────────
-(Build) ❯ Write the documentation for this repo in the README.md file. 
-You must include the features offered by this tool (in broad terms, do not list their
-specific uses), how the repo architecture is put together, and how to launch it. 
-Everything must be in English. Feel free to include mermaid diagrams.
-────────────────────────────────────────────────────────────────────────────────────────────
-🔵 I start exploring the current project before mering everything together.
-
-🟢 Glob(**/*)
-  ⎿ ./app/skills/__init__.py
-    ./app/skills/skill.py
-    ./app/skills/code-review.md
-    ... +39 lines
-
-🟢 Glob(Dockerfile)
-  ⎿ (No content)
-
-🟢 Read(pyproject.toml)
-  ⎿ 1| [project]
-    2| name = "smolcode"
-    3| readme = "README.md"
-    ... +2 lines
-
-🟢 Read(app/main.py)
-  ⎿ 1| from app.agents import agent
-    2| from app.session import Session
-    3|
-    ... +4 lines
-
-[...]
-
-🟢 Bash(ls -la README.md && wc -c README.md && python -V)
-  ⎿ -rw-r--r--  1 mlorthiois  staff  7044 Jan 12 21:27 README.md
-    7044 README.md
-    Python 3.13.5
-
-🔵 I have everything I need, I start writing the documentation.
-
-🟢 Edit(README.md)
-  ⎿  {"path": "README.md", "diff": "--- README.md\n+++ README.md\n@@ -0,0 +1,128 @@\n...
-
-🔵 I wrote the repository documentation in `README.md` (in English), including:
-- The tool’s main capabilities (high level, without detailed usage)
-- How the repo is structured and how components fit together
-- How to run it
-- Mermaid diagrams (sequence + module architecture)
-
-File updated: `README.md`
-────────────────────────────────────────────────────────────────────────────────────────────
-(Build) ❯ /agent plan
-────────────────────────────────────────────────────────────────────────────────────────────
-🟢 Agent switched
-────────────────────────────────────────────────────────────────────────────────────────────
-(Plan) ❯ Thank you!
-────────────────────────────────────────────────────────────────────────────────────────────
-🔵 You’re welcome!
-```
+![UI](./assets/ui.png)
 
 > [!NOTE]
 > The documentation below, [LEARN.md](./LEARN.md) and [this commit](https://github.com/mlorthiois/smolcode/commit/e753610a78ceedd09d1b55c38727f0bca817ddb3) were 100% written by smolcode.
@@ -84,6 +18,7 @@ File updated: `README.md`
 
 - Interactive terminal session (prompt/response loop) with a single agent model.
 - Multiple agents with switcher: Build and Plan Agents
+- Subagents: delegates focused subtasks to specialized worker agents and merges results
 - Conversation compaction
 - Tool calling:
   - Read files with line numbers
@@ -109,6 +44,7 @@ The project is intentionally small: one CLI entrypoint, one agent wrapper around
   - Loads the system prompt from `app/agents/agent_prompt.txt`
   - Registers tools and exposes their JSON schemas to the model
   - Calls the API via `app/api.py`
+- `app/subagents/`: Worker agents used for delegated subtasks
 - `app/provider.py`: Thin client for the OpenAI Responses API (`/v1/responses`). Uses `OPENAI_API_KEY`.
 - `app/tools/`: Local tool implementations (and their JSON schemas)
   - `read.py`, `glob.py`, `grep.py`, `bash.py`, `edit.py`
@@ -203,5 +139,4 @@ make smolcode
 ## TODO
 
 Of course, this repo is a playground for me. But here's what I'd like to add to it:
-- Delegation from a primary agent to a sub-agent
 - Permission management, especially for read/write/bash tools

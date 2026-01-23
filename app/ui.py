@@ -4,10 +4,11 @@ import re
 import shutil
 import subprocess
 import sys
+from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from functools import wraps
-from typing import ParamSpec, Self, TextIO, TypeVar
+from typing import ParamSpec, Protocol, Self, TextIO, TypeVar
 
 from app.schemas import FunctionCall, FunctionCallOutput, UserInputResult
 
@@ -110,11 +111,118 @@ class ToolResultEvent:
 
 
 # -------------------------------------------------------------------------
+# Printer Protocol
+# -------------------------------------------------------------------------
+class Printer(Protocol):
+    def print(self, text: str) -> None: ...
+    def render_markdown(self, text: str) -> str: ...
+
+
+# -------------------------------------------------------------------------
+# Renderers
+# -------------------------------------------------------------------------
+class Renderer(ABC):
+    """Abstract base class for UI renderers."""
+
+    def __init__(self, printer: Printer) -> None:
+        self.printer = printer
+
+    @abstractmethod
+    def text(self, event: TextEvent) -> None:
+        pass
+
+    @abstractmethod
+    def tool_call(self, event: ToolCallEvent) -> None:
+        pass
+
+    @abstractmethod
+    def tool_result(self, event: ToolResultEvent) -> None:
+        pass
+
+    @abstractmethod
+    def newline(self) -> None:
+        pass
+
+
+class DefaultRenderer(Renderer):
+    """Standard renderer for primary agent output."""
+
+    def text(self, event: TextEvent) -> None:
+        self.printer.print(
+            f"{CYAN}⏺{RESET} {self.printer.render_markdown(event.text)}\n"
+        )
+
+    def tool_call(self, event: ToolCallEvent) -> None:
+        self.printer.print(
+            f"{GREEN}⏺ {event.name.capitalize()}{RESET}({DIM}{event.arg_preview}{RESET})\n"
+        )
+
+    def tool_result(self, event: ToolResultEvent) -> None:
+        color = DIM if event.is_success else RED
+        for i, line in enumerate(event.preview):
+            prefix = "  └─ " if i == 0 else "     "
+            self.printer.print(f"{color}{prefix}{line}{RESET}\n")
+
+        if event.remaining_lines > 0:
+            self.printer.print(
+                f"{color}    ... +{event.remaining_lines} lines{RESET}\n"
+            )
+
+    def newline(self) -> None:
+        self.printer.print("\n")
+
+
+class NestedRenderer(Renderer):
+    """Tree-style renderer for subagent output."""
+
+    def __init__(self, printer: Printer, depth: int) -> None:
+        super().__init__(printer)
+        self.depth = depth
+
+    def _tree_prefix(self, is_last: bool = False) -> str:
+        indent = "  " + "│   " * (self.depth - 1)
+        connector = "└─ " if is_last else "├─ "
+        return f"{DIM}{indent}{connector}{RESET}"
+
+    def _tree_continuation(self) -> str:
+        return f"{DIM}  " + "│  " * self.depth + f"{RESET}"
+
+    def text(self, event: TextEvent) -> None:
+        pass
+
+    def tool_call(self, event: ToolCallEvent) -> None:
+        prefix = self._tree_prefix()
+        self.printer.print(
+            f"{prefix}{GREEN}⏺ {event.name.capitalize()}{RESET}({DIM}{event.arg_preview}{RESET})\n"
+        )
+
+    def tool_result(self, event: ToolResultEvent) -> None:
+        color = DIM if event.is_success else RED
+        cont = self._tree_continuation()
+        if event.preview:
+            self.printer.print(f"{cont}⎿ {color}{event.preview[0]}{RESET}\n")
+
+    def newline(self) -> None:
+        pass
+
+
+# -------------------------------------------------------------------------
 # TUI
 # -------------------------------------------------------------------------
 class TerminalUI:
     def __init__(self, out: TextIO | None = None) -> None:
         self._out = out if out is not None else sys.stdout
+        self._renderer_stack: list[Renderer] = [DefaultRenderer(self)]
+
+    def _current_renderer(self) -> Renderer:
+        return self._renderer_stack[-1]
+
+    def push_renderer(self, renderer: Renderer) -> None:
+        self._renderer_stack.append(renderer)
+
+    def pop_renderer(self) -> None:
+        if len(self._renderer_stack) > 1:
+            self._renderer_stack.pop()
 
     def _terminal_width(self, out: TextIO) -> int:
         size = shutil.get_terminal_size(fallback=(100, 20))
@@ -126,11 +234,14 @@ class TerminalUI:
     def print(self, text: str) -> None:
         self._out.write(text)
 
+    def render_markdown(self, text: str) -> str:
+        return re.sub(r"\*\*(.+?)\*\*", f"{BOLD}\\1{RESET}", text)
+
     def error(self, event: TextEvent) -> None:
         self.print(f"{RED}⏺ Error: {event.text}{RESET}\n")
 
     def newline(self) -> None:
-        self.print("\n")
+        self._current_renderer().newline()
 
     def separator_line(self) -> None:
         self.print(self._separator(self._out) + "\n")
@@ -138,11 +249,7 @@ class TerminalUI:
     def _clear_screen_if_tty(self, out: TextIO) -> None:
         if not out.isatty():
             return
-        # ANSI clear screen + cursor home
         self.print("\033[2J\033[H")
-
-    def render_markdown(self, text: str) -> str:
-        return re.sub(r"\*\*(.+?)\*\*", f"{BOLD}\\1{RESET}", text)
 
     def header(self, event: HeaderEvent) -> None:
         self._clear_screen_if_tty(self._out)
@@ -167,24 +274,16 @@ class TerminalUI:
         self._out.flush()
 
     def text(self, event: TextEvent) -> None:
-        self.print(f"{CYAN}⏺{RESET} {self.render_markdown(event.text)}\n")
+        self._current_renderer().text(event)
 
     def status(self, event: TextEvent) -> None:
         self.print(f"{GREEN}⏺ {self.render_markdown(event.text)}{RESET}\n")
 
     def tool_call(self, event: ToolCallEvent) -> None:
-        self.print(
-            f"{GREEN}⏺ {event.name.capitalize()}{RESET}({DIM}{event.arg_preview}{RESET})\n"
-        )
+        self._current_renderer().tool_call(event)
 
     def tool_result(self, event: ToolResultEvent) -> None:
-        color = DIM if event.is_success else RED
-        for i, line in enumerate(event.preview):
-            prefix = "  ⎿ " if i == 0 else "    "
-            self.print(f"{color}{prefix}{line}{RESET}\n")
-
-        if event.remaining_lines > 0:
-            self.print(f"{color}    ... +{event.remaining_lines} lines{RESET}\n")
+        self._current_renderer().tool_result(event)
 
 
 # -------------------------------------------------------------------------
@@ -210,7 +309,30 @@ def clear_ui() -> None:
 
 
 # -------------------------------------------------------------------------
-# Expose TUI API to session
+# Depth management (delegates to renderer stack)
+# -------------------------------------------------------------------------
+_DEPTH: int = 0
+
+
+def push_depth() -> None:
+    global _DEPTH
+    _DEPTH += 1
+    ui = require_ui()
+    ui.push_renderer(NestedRenderer(ui, _DEPTH))
+
+
+def pop_depth() -> None:
+    global _DEPTH
+    _DEPTH = max(0, _DEPTH - 1)
+    require_ui().pop_renderer()
+
+
+def get_depth() -> int:
+    return _DEPTH
+
+
+# -------------------------------------------------------------------------
+# Decorators
 # -------------------------------------------------------------------------
 def ui_header(
     event_factory: Callable[P, HeaderEvent],

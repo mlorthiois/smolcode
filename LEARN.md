@@ -13,7 +13,8 @@ This document explains how AI coding agents (like Claude Code, OpenAI Codex CLI,
 4. [Tools: Giving the AI Hands](#tools-giving-the-ai-hands)
 5. [The System Prompt: Shaping Behavior](#the-system-prompt-shaping-behavior)
 6. [Skills: Dynamic Instruction Loading](#skills-dynamic-instruction-loading)
-7. [Putting It All Together](#putting-it-all-together)
+7. [Subagents: Delegated Work](#subagents-delegated-work)
+8. [Putting It All Together](#putting-it-all-together)
 
 ---
 
@@ -424,6 +425,60 @@ class SkillsTool(Tool):
 ```
 
 When the LLM needs to do a code review, it can call `skills(skill_name="code-review")` to load specialized instructions into the conversation.
+
+---
+
+## Subagents: Delegated Work
+
+Subagents are small helper agents that run a focused task and return a single result to the main agent. This lets the main agent split work into parallel or specialized units without losing control of the overall plan.
+
+Key idea:
+- The main agent stays responsible for user-facing output and decisions.
+- Each subagent gets a narrow prompt and a clear return format.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant M as Main Agent
+    participant S as Subagent
+
+    U->>M: request
+    M->>S: focused subtask + constraints
+    S-->>M: single result
+    M-->>U: final answer
+```
+
+Overview:
+
+```python
+def handle_user_request(user_input):
+    plan = main_agent.plan(user_input)
+
+    for task in plan.subtasks:
+        worker_prompt = make_subagent_prompt(task)
+        result = run_subagent(worker_prompt)
+        main_agent.last_context.add_subagent_result(result)
+
+    final = main_agent.compose_answer()
+    return final
+```
+
+Minimal flow with tool calls:
+
+```python
+def agent_loop(user_input, tools):
+    while True:
+        response = call_llm(user_input, tools=tools)
+
+        if response.calls_tool("subagent"):
+            subtask = response.tool_args
+            result = subagent_tool(subtask)
+            context.add_tool_output(result)
+            continue
+
+        return response.text
+```
 
 ---
 
