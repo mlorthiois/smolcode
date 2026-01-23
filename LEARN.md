@@ -29,7 +29,9 @@ You might expect building an AI agent to require complex Agent libraries or spec
 ```mermaid
 flowchart LR
     User([User]) --> Session
+    Session --> Context
     Session --> Agent
+    Agent --> Context
     Agent --> LLM[(LLM API)]
     LLM --> Agent
     Agent --> Tools[Local Tools]
@@ -53,40 +55,29 @@ The `Session` is the orchestrator. It manages:
 
 ```python
 # app/session.py (simplified)
-@dataclass
 class Session:
     agent: AgentName
-    messages: list[Input] = field(default_factory=list)
+    context: Context  # Encapsulates conversation history
 
-    def step(self) -> None:
+    def loop(self):
         while True:
-            response = self.get_agent().call(self.messages)
-            has_tool = False
+            user_input = get_user_input()  # Handle /quit, /clear, etc.
+            if user_input.is_command:
+                continue
             
-            for block in response["output"]:
-                if block["type"] == "message":
-                    # LLM responded with text - print it
-                    content = block["content"][0]["text"]
-                    self.messages.append(Message(role="assistant", content=content))
-                
-                if block["type"] == "function_call":
-                    # LLM wants to use a tool - execute it
-                    function_call = FunctionCall(
-                        call_id=block["call_id"],
-                        name=block["name"],
-                        arguments=block.get("arguments", "{}"),
-                    )
-                    result = self.run_tool(function_call)
+            self.context.add_user_message(user_input)
+            self.agent.run(self.messages)  # Delegate to the Agent
+```
 
-                    # Remember tool output should be sent back to the model
-                    has_tool = True
-                    
-                    # Add both the call and result to history
-                    self.messages += [function_call, result]
+The `Messages` class encapsulates the conversation history:
 
-            # if no tool output to send back to the model, break the model loop
-            if not has_tool:
-                return
+```python
+# app/context.py (simplified)
+class Context: # Stores all messages, function calls, and outputs
+    def add_user_message(self, message): ...
+    def add_assistant(self, message): ...
+    def add_function_call(self, call): ...
+    def add_function_output(self, output): ...
 ```
 
 ### 2. The Agent
@@ -98,25 +89,31 @@ The `Agent` wraps the LLM interaction. It holds:
 
 ```python
 # app/agents/base_agent.py
-@dataclass
 class Agent:
     model: str
     instructions: str
     tools: dict[str, Tool]
+    tools_schema: list[ToolSchema]  # Generated from tools in __post_init__
 
-    def __post_init__(self):
-        # Convert tools to JSON schemas the API understands
-        self.tools_schema: list[ToolSchema] = []
-        for tool_name, tool in self.tools.items():
-            self.tools_schema.append(tool.make_schema(tool_name))
+    def run(self, context: Context):
+        """The agent loop: call LLM, execute tools, repeat until text response"""
+        while True:
+            has_tool = False
+            response = call_api(context, self.model, self.instructions, self.tools_schema)
+            
+            for block in response:
+                if block.is_message:
+                    context.add_assistant(block)
 
-    def call(self, messages: list[Input]):
-        return call_api(
-            messages,
-            self.model,
-            self.instructions,
-            self.tools_schema,
-        )
+                if block.is_function_call:
+                    context.add_function_call(block)
+                    has_tool = True
+                    
+                    output = self.tools[block.name](block.arguments)
+                    context.add_function_output(output)
+
+            if not has_tool:
+                return  # No more tools to run, we're done
 ```
 
 ### 3. The Provider
@@ -128,7 +125,7 @@ The `Provider` handles the actual HTTP communication with the LLM API. Notice ho
 API_URL = "https://api.openai.com/v1/responses"
 
 def call_api(
-    messages: list[Input],
+    context: list[Input],
     model: str,
     system_prompt: str,
     tools_schema: list[ToolSchema],
@@ -164,31 +161,34 @@ sequenceDiagram
     autonumber
     participant User
     participant Session
+    participant Context
     participant Agent
     participant API as LLM API
     participant Tools
 
     User->>Session: "Read main.py and add a docstring"
-    Session->>Agent: messages[]
+    Session->>Context: add_user_message()
+    Session->>Agent: run(messages)
     Agent->>API: POST /v1/responses
     API-->>Agent: function_call: read(path="main.py")
     
-    Agent-->>Session: function_call block
-    Session->>Tools: read({"path": "main.py"})
-    Tools-->>Session: "def main():..."
-    Session->>Agent: messages + function_call_output
+    Agent->>Context: add_function_call()
+    Agent->>Tools: read({"path": "main.py"})
+    Tools-->>Agent: "def main():..."
+    Agent->>Context: add_function_call_output()
     
     Agent->>API: POST /v1/responses (continue)
     API-->>Agent: function_call: edit(...)
     
-    Agent-->>Session: function_call block
-    Session->>Tools: edit({...})
-    Tools-->>Session: "diff: +docstring added"
-    Session->>Agent: messages + function_call_output
+    Agent->>Context: add_function_call()
+    Agent->>Tools: edit({...})
+    Tools-->>Agent: "diff: +docstring added"
+    Agent->>Context: add_function_call_output()
     
     Agent->>API: POST /v1/responses (continue)
     API-->>Agent: message: "Done! Added docstring to main.py"
-    Agent-->>Session: message block
+    Agent->>Context: add_assistant_message()
+    Agent-->>Session: return messages
     Session-->>User: "Done! Added docstring to main.py"
 ```
 

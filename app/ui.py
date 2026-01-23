@@ -84,9 +84,12 @@ class ToolCallEvent:
 class ToolResultEvent:
     preview: tuple[str, ...]
     remaining_lines: int
+    is_success: bool
 
     @classmethod
-    def from_function_call_output(cls, result: FunctionCallOutput | str) -> Self:
+    def from_function_call_output_and_success(
+        cls, result: FunctionCallOutput | str, is_success: bool
+    ) -> Self:
         result_str = result.output if isinstance(result, FunctionCallOutput) else result
 
         result_lines = result_str.split("\n")
@@ -99,7 +102,11 @@ class ToolResultEvent:
             preview.append(line)
 
         remaining_lines = max(len(result_lines) - 3, 0)
-        return cls(preview=tuple(preview), remaining_lines=remaining_lines)
+        return cls(
+            preview=tuple(preview),
+            remaining_lines=remaining_lines,
+            is_success=is_success,
+        )
 
 
 # -------------------------------------------------------------------------
@@ -171,12 +178,13 @@ class TerminalUI:
         )
 
     def tool_result(self, event: ToolResultEvent) -> None:
+        color = DIM if event.is_success else RED
         for i, line in enumerate(event.preview):
             prefix = "  ⎿ " if i == 0 else "    "
-            self.print(f"{DIM}{prefix}{line}{RESET}\n")
+            self.print(f"{color}{prefix}{line}{RESET}\n")
 
         if event.remaining_lines > 0:
-            self.print(f"{DIM}    ... +{event.remaining_lines} lines{RESET}\n")
+            self.print(f"{color}    ... +{event.remaining_lines} lines{RESET}\n")
 
 
 # -------------------------------------------------------------------------
@@ -274,12 +282,14 @@ def ui_tool_extract(func: Callable[P, FunctionCall]) -> Callable[P, FunctionCall
 
 
 def ui_tool_result(
-    func: Callable[P, FunctionCallOutput | str],
-) -> Callable[P, FunctionCallOutput | str]:
+    func: Callable[P, tuple[FunctionCallOutput, bool]],
+) -> Callable[P, tuple[FunctionCallOutput, bool]]:
     @wraps(func)
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> FunctionCallOutput | str:
-        result = func(*args, **kwargs)
-        require_ui().tool_result(ToolResultEvent.from_function_call_output(result))
-        return result
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> tuple[FunctionCallOutput, bool]:
+        result, is_success = func(*args, **kwargs)
+        require_ui().tool_result(
+            ToolResultEvent.from_function_call_output_and_success(result, is_success)
+        )
+        return result, is_success
 
     return wrapper

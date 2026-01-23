@@ -128,20 +128,19 @@ sequenceDiagram
   participant T as Local Tools
 
   U->>S: typed input
-  S->>A: messages[]
+  S->>A: context[]
   A->>API: /v1/responses (model + instructions + tools)
   API-->>A: output blocks (message | function_call)
-  A-->>S: response
 
   alt message block
-    S-->>U: print assistant text
+    A-->>U: print assistant text
+    A-->>S: extend context
   else function_call block
-    S->>T: run tool(name, args)
-    T-->>S: tool output
-    S->>A: append function_call_output
+    A->>T: run tool(name, args)
+    T-->>A: tool output
+    A-->>S: extend context
     A->>API: continue
     API-->>A: next blocks
-    A-->>S: response
   end
 ```
 
@@ -151,6 +150,7 @@ sequenceDiagram
 flowchart TD
   main[app/main.py] --> session[app/session.py]
   session --> agent[app/agents/*.py]
+  session --> context[app/context.py]
   agent --> api[app/provider.py]
   agent --> tools[app/tools/*]
   agent --> prompt[app/agents/agent_prompt.txt]

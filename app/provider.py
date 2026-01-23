@@ -4,20 +4,21 @@ import urllib.request
 from dataclasses import asdict
 from typing import Any
 
-from app.schemas import Input, ToolSchema
+from app.context import Context
+from app.schemas import ToolSchema
 
 API_URL = "https://api.openai.com/v1/responses"
 OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
 
 
 def call_api(
-    messages: list[Input],
+    context: Context,
     model: str,
     system_prompt: str,
     tools_schema: list[ToolSchema],
 ) -> dict[str, Any]:
     # Serialize inputs
-    input = [asdict(m) for m in messages]
+    input = context.to_provider_input()
     tools_schema_json = [asdict(schema) for schema in tools_schema]
 
     payload = json.dumps(

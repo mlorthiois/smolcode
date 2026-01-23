@@ -18,9 +18,12 @@ class ToolSchema:
     type: str = "function"
 
 
+Role = Literal["user", "assistant"]
+
+
 @dataclass
 class Message:
-    role: Literal["user", "assistant"]
+    role: Role
     content: str
 
 
