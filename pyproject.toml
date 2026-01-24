@@ -4,3 +4,17 @@ version = "0.1.0"
 readme = "README.md"
 requires-python = "==3.13.*"
 dependencies = []
+
+[project.scripts]
+smolcode = "app.main:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app", "config"]
+
+[tool.setuptools.package-data]
+config = ["**/*.md", "**/*.txt"]

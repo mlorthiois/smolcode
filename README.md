@@ -114,6 +114,26 @@ flowchart
   - **API Key**: An OpenAI API key
   - **OAuth**: A ChatGPT Plus/Pro subscription (uses the Codex API)
 
+## Installation
+
+Install with pipx for an isolated CLI (recommended):
+
+```bash
+pipx install -e .
+```
+
+Or install in a virtual environment:
+
+```bash
+pip install -e .
+```
+
+Install with uv:
+
+```bash
+uv tool install --editable .
+```
+
 ## Usage
 
 smolcode supports two authentication modes:
@@ -124,7 +144,7 @@ Use your OpenAI API key directly:
 
 ```bash
 export OPENAI_API_KEY="sk-..."
-make smolcode
+smolcode
 ```
 
 ### Option 2: OAuth Mode (ChatGPT Plus/Pro)
@@ -136,11 +156,11 @@ Use your ChatGPT subscription via OAuth:
 
 ```bash
 # First, login (opens browser for authentication)
-make login
+smolcode login
 
 # Then, run smolcode
 export SMOLCODE_OAUTH="true"
-make smolcode
+smolcode
 ```
 
 The OAuth flow uses PKCE and stores tokens in `~/.config/smolcode/auth.json`.
