@@ -2,7 +2,8 @@ import sys
 from dataclasses import dataclass, field
 from typing import cast, get_args
 
-from app.agents import AGENTS, Agent, AgentName
+from app.core.agent import Agent
+from app.registry import AgentName, Registry
 from app.context import Context
 from app.schemas import (
     Message,
@@ -28,7 +29,7 @@ class Session:
     context: Context = field(default_factory=Context)
 
     def get_agent(self) -> Agent:
-        return AGENTS[self.agent]
+        return Registry.agents()[self.agent]
 
     @ui_user_input
     @ui_prompt(lambda self: PromptEvent(agent_name=self.agent.title()))

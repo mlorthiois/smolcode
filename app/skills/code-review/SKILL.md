@@ -1,5 +1,6 @@
 ---
-Perform code reviews following best engineering practices. Use when reviewing pull requests, examining code changes, or providing feedback on code quality. Covers security, performance, testing, and design review.
+name: code-review
+description: Perform code reviews following best engineering practices. Use when reviewing pull requests, examining code changes, or providing feedback on code quality. Covers security, performance, testing, and design review.
 ---
 ## Review Checklist
 

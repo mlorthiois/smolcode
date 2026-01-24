@@ -1,4 +1,6 @@
 ---
+name: code
+model: gpt-5.2-codex
 description: Implement code changes, write files, and run commands
 tools: read, glob, grep, edit, write, bash
 ---

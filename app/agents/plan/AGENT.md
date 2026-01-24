@@ -1,3 +1,9 @@
+---
+name: plan
+model: gpt-5.2-codex
+tools: read, glob, grep, bash, webfetch, skills, subagent
+---
+
 # Plan Mode
 
 CRITICAL: Plan mode ACTIVE - you are in READ-ONLY phase. STRICTLY FORBIDDEN:

@@ -1,5 +1,6 @@
 ---
-Always read this file before making any python change. It enumerates python development best practices to follow.
+name: python-best-practices
+description: Always read this file before making any python change. It enumerates python development best practices to follow.
 ---
 # Python best practices
 

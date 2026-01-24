@@ -89,7 +89,7 @@ The `Agent` wraps the LLM interaction. It holds:
 - Available tools and their schemas
 
 ```python
-# app/agents/base_agent.py
+# app/core/agent.py
 class Agent:
     model: str
     instructions: str
@@ -211,7 +211,7 @@ Each tool has three parts:
 3. **Output**: Text result returned to the LLM
 
 ```python
-# app/tools/base_tool.py
+# app/core/tool.py
 @dataclass
 class Tool(ABC):
     description: ClassVar[str]
@@ -325,11 +325,13 @@ The system prompt (or "instructions") is crucial. It defines:
 
 ```python
 # app/agents/build.py
-base_instructions = (Path(__file__).parent / "prompt" / "base.txt").read_text()
+instructions = """\
+You are an helpful agent.
+"""
 
 agent = Agent(
     model="gpt-5.2",
-    instructions=instructions.format(path=os.getcwd()),
+    instructions=instructions,
     tools={
         "read": ReadTool(),
         "glob": GlobTool(),
@@ -378,7 +380,8 @@ Skills are markdown files that contain specialized instructions:
 
 ```markdown
 ---
-Perform thorough code reviews focusing on bugs, security, and best practices
+name: code-review
+description: Perform thorough code reviews focusing on bugs, security, and best practices
 ---
 
 # Code Review Skill
@@ -394,7 +397,7 @@ When reviewing code, focus on:
 The `SkillsTool` loads these dynamically:
 
 ```python
-# app/skills/skill.py
+# app/skill.py
 @dataclass
 class Skill:
     name: str
@@ -403,16 +406,7 @@ class Skill:
 
     @classmethod
     def from_file(cls, f: Path) -> Self:
-        name = f.name.rstrip(".md")
-        content = f.read_text().strip()
-        
-        # Parse frontmatter for description
-        if content.startswith("---"):
-            lines = content.split("\n")
-            description = lines[1]
-            content = "\n".join(lines[2:])
-            return cls(name=name, content=content, description=description)
-        
+        ... # parse frontmatter and content
         return cls(name=name, content=content, description=None)
 
 

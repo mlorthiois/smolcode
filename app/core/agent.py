@@ -1,20 +1,14 @@
 import json
 from dataclasses import dataclass, field
-from typing import Iterator
+from pathlib import Path
+from typing import Iterator, Self
 
 from app.context import Context
+from app.core.tool import Tool
 from app.provider import call_api
-from app.schemas import (
-    FunctionCall,
-    FunctionCallOutput,
-    Message,
-    ToolSchema,
-)
-from app.tools import TOOLS
-from app.tools.base_tool import Tool
-from app.ui import (
-    require_ui,
-)
+from app.schemas import FunctionCall, FunctionCallOutput, Message, ToolSchema
+from app.ui import require_ui
+from app.utils.markdown import MarkdownFrontmatter, parse_list
 
 
 @dataclass
@@ -22,14 +16,20 @@ class Agent:
     model: str
     instructions: str
     tool_names: list[str] = field(default_factory=list)
+    name: str = ""
+    description: str = ""
+    tools_registry: dict[str, Tool] | None = None
 
     def __post_init__(self):
         self.tools: dict[str, Tool] = {}
         self.tools_schema: list[ToolSchema] = []
 
+        if not self.tools_registry:
+            return
+
         for name in self.tool_names:
-            if name in TOOLS:
-                tool = TOOLS[name]
+            if name in self.tools_registry:
+                tool = self.tools_registry[name]
                 self.tools[name] = tool
                 self.tools_schema.append(tool.make_schema(name))
 
@@ -81,7 +81,7 @@ class Agent:
     def run(self, context: Context) -> Context:
         while True:
             has_tool = False
-            for i, block in enumerate(self._turn(context)):
+            for block in self._turn(context):
                 if isinstance(block, Message):
                     context.add_assistant_message(block)
 
@@ -98,3 +98,43 @@ class Agent:
             # if no tool output to send back to the model, break the model loop
             if not has_tool:
                 return context
+
+    @classmethod
+    def from_file(
+        cls,
+        path: Path,
+        *,
+        base_instructions: str = "",
+        context: dict[str, str] | None = None,
+        tools_registry: dict[str, Tool] | None = None,
+    ) -> Self:
+        parsed = MarkdownFrontmatter.from_file(path)
+        name = parsed.frontmatter.get("name", path.parent.name)
+
+        if not parsed.has_frontmatter:
+            raise ValueError(f"Agent {name} must have frontmatter")
+
+        model = parsed.frontmatter.get("model", "gpt-5.2-codex")
+        description = parsed.frontmatter.get("description", "")
+        tools = parse_list(parsed.frontmatter.get("tools", ""))
+
+        instructions = base_instructions
+        if parsed.body:
+            if instructions and not instructions.endswith("\n"):
+                instructions += "\n"
+            instructions += parsed.body
+
+        if context is not None:
+            instructions = instructions.format(**context)
+
+        return cls(
+            name=name,
+            model=model,
+            description=description,
+            instructions=instructions,
+            tool_names=tools,
+            tools_registry=tools_registry,
+        )
+
+
+__all__ = ["Agent"]

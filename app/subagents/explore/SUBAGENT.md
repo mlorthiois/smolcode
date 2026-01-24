@@ -1,4 +1,6 @@
 ---
+name: explore
+model: gpt-5.2-codex
 description: Explore codebase to find relevant files and understand code structure
 tools: read, glob, grep
 ---

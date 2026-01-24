@@ -83,23 +83,26 @@ sequenceDiagram
 ### Architecture (Modules)
 
 ```mermaid
-flowchart TD
-  main[app/main.py] --> session[app/session.py]
-  session --> agent[app/agents/*.py]
-  session --> context[app/context.py]
-  agent --> api[app/provider.py]
-  agent --> tools[app/tools/*]
-  agent --> prompt[app/agents/agent_prompt.txt]
+flowchart 
+  User --> session[Session]
+  session --> agent[Agent]
+  session --> context[Context]
+
+  agent --> api[LLM]
+  agent --> tools[Tools]
+  agent --> prompt[Instructions]
+  agent --> context
 
   tools --> read[ReadTool]
-  tools --> glob[GlobTool]
-  tools --> grep[GrepTool]
-  tools --> bash[BashTool]
   tools --> edit[EditTool]
+  tools --> bash[BashTool]
+  tools --> ...
+  tools --> subagent[SubAgent]
+
+  subagent -->|delegate| agent
 
   agent --> skillsTool[SkillsTool]
-  skillsTool --> skillsMd[app/skills/*.md]
-  session --> ui[app/ui.py]
+  skillsTool --> Skill.md
 ```
 
 ## Requirements

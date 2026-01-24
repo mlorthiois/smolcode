@@ -1,6 +1,6 @@
 import subprocess
 
-from .base_tool import Tool
+from app.core.tool import Tool
 
 
 class BashTool(Tool):
