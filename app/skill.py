@@ -4,13 +4,8 @@ from typing import Self
 
 from app.registry import Registry
 from app.schemas import ToolSchema
-from app.core.tool import Tool
+from app.tool import Tool
 from app.utils.markdown import MarkdownFrontmatter
-
-
-def list_skill_files() -> list[Path]:
-    skills_dir = Path(__file__).resolve().parent / "skills"
-    return sorted(skills_dir.glob("*/SKILL.md"))
 
 
 @dataclass

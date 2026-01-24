@@ -1,7 +1,7 @@
 import re
 from pathlib import Path
 
-from app.core.tool import Tool
+from app.tool import Tool
 
 
 class GrepTool(Tool):
@@ -20,7 +20,7 @@ class GrepTool(Tool):
             try:  # Binary file
                 content = p.read_text()
             except Exception:
-                pass
+                continue
 
             try:
                 for line_num, line in enumerate(content.splitlines()):

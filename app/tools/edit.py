@@ -20,7 +20,7 @@ from typing import (
     Tuple,
 )
 
-from app.core.tool import Tool
+from app.tool import Tool
 
 MAX_DIAGNOSTICS_PER_FILE = 20
 

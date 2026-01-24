@@ -89,7 +89,7 @@ The `Agent` wraps the LLM interaction. It holds:
 - Available tools and their schemas
 
 ```python
-# app/core/agent.py
+# app/agent.py
 class Agent:
     model: str
     instructions: str
@@ -211,7 +211,7 @@ Each tool has three parts:
 3. **Output**: Text result returned to the LLM
 
 ```python
-# app/core/tool.py
+# app/tool.py
 @dataclass
 class Tool(ABC):
     description: ClassVar[str]

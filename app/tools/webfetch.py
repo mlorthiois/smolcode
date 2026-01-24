@@ -1,6 +1,6 @@
 import urllib.request
 
-from app.core.tool import Tool
+from app.tool import Tool
 
 MAX_BYTES: int = 1_000_000
 TIMEOUT_SEC: float = 10.0

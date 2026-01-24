@@ -40,16 +40,18 @@ The project is intentionally small: one CLI entrypoint, one agent wrapper around
   - Calls the agent
   - Dispatches tool calls
   - Appends tool outputs back into the message stream
-- `app/agents/base_agent.py`: Defines the `Agent`:
-  - Loads the system prompt from `app/agents/agent_prompt.txt`
+- `app/agent.py`: Defines the `Agent`:
+  - Loads base instructions from `config/agents/common.txt`
+  - Loads agent markdown from `config/agents/`
   - Registers tools and exposes their JSON schemas to the model
-  - Calls the API via `app/api.py`
-- `app/subagents/`: Worker agents used for delegated subtasks
+  - Calls the API via `app/provider.py`
+- `config/agents/`: Markdown agent definitions
+- `config/subagents/`: Worker agents used for delegated subtasks
 - `app/provider.py`: Thin client for the OpenAI Responses API (`/v1/responses`). Uses `OPENAI_API_KEY`.
 - `app/tools/`: Local tool implementations (and their JSON schemas)
   - `read.py`, `glob.py`, `grep.py`, `bash.py`, `edit.py`
-- `app/skills/`: Markdown “skill” files + loader
-  - `skill.py` scans `app/skills/*.md` and exposes them through a `skills` tool
+- `config/skills/`: Markdown “skill” files + loader
+  - `Registry` scans `config/skills/*.md` and exposes them through a `skills` tool
 - `app/ui.py`: Terminal output formatting and decorators used by `Session`.
 
 ### Control Flow
@@ -130,14 +132,16 @@ make smolcode
 - `/quit` or `/q`: quit
 - `/clear` or `/c`: clear the current conversation context
 
-## Notes
+## Configuration
 
-- `app/tools/edit.py` implements an exact-text replacement strategy with fallbacks to make edits more robust.
+- Default markdown config lives in `config/agents/`, `config/subagents/`, and `config/skills/`.
+- Base agent instructions live in `config/agents/common.txt` (override in `$XDG_CONFIG_HOME/smolcode/agents/common.txt`).
+- You can add or override agents/subagents/skills in `$XDG_CONFIG_HOME/smolcode` (fallback: `~/.config/smolcode`).
+- `$XDG_CONFIG_HOME` takes priority over the repository config during loading.
+- Add new tools by implementing `Tool` in `app/tool.py`, then registering them in `app/registry.py`.
 
-## Development Tips
-
-- Add new tools by implementing `Tool` in `app/tools/base_tool.py`, then registering them in `app/agent.py`.
-- Add new skills by dropping a `*.md` file into `app/skills/`.
+> [!NOTE]
+> `app/tools/edit.py` implements an exact-text replacement strategy with fallbacks to make edits more robust.
 
 ## TODO
 

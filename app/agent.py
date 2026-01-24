@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Iterator, Self
 
 from app.context import Context
-from app.core.tool import Tool
+from app.tool import Tool
 from app.provider import call_api
 from app.schemas import FunctionCall, FunctionCallOutput, Message, ToolSchema
 from app.ui import require_ui

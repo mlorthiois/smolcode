@@ -1,7 +1,7 @@
 from app.context import Context
 from app.registry import Registry
 from app.schemas import Message, ToolSchema
-from app.core.tool import Tool
+from app.tool import Tool
 from app.ui import pop_depth, push_depth
 
 

@@ -1,4 +1,4 @@
-from app.core.tool import Tool
+from app.tool import Tool
 
 
 class ReadTool(Tool):

@@ -2,7 +2,7 @@ import sys
 from dataclasses import dataclass, field
 from typing import cast, get_args
 
-from app.core.agent import Agent
+from app.agent import Agent
 from app.registry import AgentName, Registry
 from app.context import Context
 from app.schemas import (
