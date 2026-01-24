@@ -1,5 +1,7 @@
+from dataclasses import dataclass
+
+from app.agent import Agent
 from app.context import Context
-from app.registry import Registry
 from app.schemas import Message, ToolSchema
 from app.tool import Tool
 from app.ui import pop_depth, push_depth
@@ -10,18 +12,19 @@ Delegate a focused subtask to a specialized autonomous subagent. The subagent ru
 """
 
 
+@dataclass
 class SubAgentTool(Tool):
     """Tool that delegates a task to a specialized subagent."""
 
+    subagents: dict[str, Agent]
     description = subagent_description
     args = {"subagent_name": "string", "task": "string"}
 
     def _build_description(self) -> str:
-        subagents = Registry.subagents()
         return subagent_description.format(
             subagents="".join(
                 f"<subagent><name>{s.name}</name><description>{s.description}</description></subagent>"
-                for s in subagents.values()
+                for s in self.subagents.values()
             )
         )
 
@@ -33,7 +36,6 @@ class SubAgentTool(Tool):
         return "(No response from subagent)"
 
     def make_schema(self, name: str) -> ToolSchema:
-        subagents = Registry.subagents()
         return ToolSchema(
             name=name,
             description=self._build_description(),
@@ -43,7 +45,7 @@ class SubAgentTool(Tool):
                     "subagent_name": {
                         "type": "string",
                         "description": "Exact identifier of the subagent to use. Must be one of the available subagents.",
-                        "enum": list(subagents.keys()),
+                        "enum": list(self.subagents.keys()),
                     },
                     "task": {
                         "type": "string",
@@ -55,10 +57,9 @@ class SubAgentTool(Tool):
         )
 
     def __call__(self, args: dict) -> str:
+        subagents = self.subagents
         subagent_name = args["subagent_name"]
         task = args["task"]
-
-        subagents = Registry.subagents()
 
         if subagent_name not in subagents:
             return f"error: unknown subagent '{subagent_name}'. Available: {list(subagents.keys())}"
@@ -76,3 +77,6 @@ class SubAgentTool(Tool):
             pop_depth()
 
         return summary
+
+    def subagent_names(self) -> list[str]:
+        return list(self.subagents.keys())

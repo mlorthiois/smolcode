@@ -129,6 +129,9 @@ make smolcode
 
 ### Option 2: OAuth Mode (ChatGPT Plus/Pro)
 
+> [!CAUTION]
+> OpenAI OAuth is used because stated as allowed in OSS in this [tweet](https://x.com/thsottiaux/status/2009714843587342393). Please contact me if not authorized.
+
 Use your ChatGPT subscription via OAuth:
 
 ```bash
@@ -158,8 +161,3 @@ The OAuth flow uses PKCE and stores tokens in `~/.config/smolcode/auth.json`.
 
 > [!NOTE]
 > `app/tools/edit.py` implements an exact-text replacement strategy with fallbacks to make edits more robust.
-
-## TODO
-
-Of course, this repo is a playground for me. But here's what I'd like to add to it:
-- Permission management, especially for read/write/bash tools

@@ -13,28 +13,23 @@ from app.utils.markdown import MarkdownFrontmatter, parse_list
 
 @dataclass
 class Agent:
+    provider: Provider
     model: str
     instructions: str
-    tool_names: list[str] = field(default_factory=list)
+    tools: dict[str, Tool] = field(default_factory=dict)
     name: str = ""
     description: str = ""
     tools_registry: dict[str, Tool] | None = None
 
     def __post_init__(self):
-        self.tools: dict[str, Tool] = {}
         self.tools_schema: list[ToolSchema] = []
+        for name, tool in self.tools.items():
+            self.tools_schema.append(tool.make_schema(name))
 
-        if not self.tools_registry:
-            return
-
-        for name in self.tool_names:
-            if name in self.tools_registry:
-                tool = self.tools_registry[name]
-                self.tools[name] = tool
-                self.tools_schema.append(tool.make_schema(name))
-
-    def _call(self, context: Context, provider: Provider):
-        return provider.call(
+    def _call(self, context: Context):
+        if self.provider is None:
+            raise RuntimeError("Provider is not configured.")
+        return self.provider.call(
             context,
             self.model,
             self.instructions,
@@ -67,10 +62,8 @@ class Agent:
             is_success,
         )
 
-    def _turn(
-        self, context: Context, provider: Provider
-    ) -> Iterator[Message | FunctionCall]:
-        response = self._call(context, provider)
+    def _turn(self, context: Context) -> Iterator[Message | FunctionCall]:
+        response = self._call(context)
         for block in response["output"]:
             if block["type"] == "message":
                 yield self._extract_message(block)
@@ -80,10 +73,10 @@ class Agent:
                 yield self._extract_function_call(block)
                 continue
 
-    def run(self, context: Context, provider: Provider) -> Context:
+    def run(self, context: Context) -> Context:
         while True:
             has_tool = False
-            for block in self._turn(context, provider):
+            for block in self._turn(context):
                 if isinstance(block, Message):
                     context.add_assistant_message(block)
 
@@ -106,9 +99,10 @@ class Agent:
         cls,
         path: Path,
         *,
+        provider: Provider,
+        tools_registry: dict[str, Tool],
         base_instructions: str = "",
         context: dict[str, str] | None = None,
-        tools_registry: dict[str, Tool] | None = None,
     ) -> Self:
         parsed = MarkdownFrontmatter.from_file(path)
         name = parsed.frontmatter.get("name", path.parent.name)
@@ -116,9 +110,9 @@ class Agent:
         if not parsed.has_frontmatter:
             raise ValueError(f"Agent {name} must have frontmatter")
 
-        model = parsed.frontmatter.get("model", "gpt-5.2-codex")
+        model = parsed.frontmatter["model"]
         description = parsed.frontmatter.get("description", "")
-        tools = parse_list(parsed.frontmatter.get("tools", ""))
+        tool_names = parse_list(parsed.frontmatter.get("tools", ""))
 
         instructions = base_instructions
         if parsed.body:
@@ -129,11 +123,16 @@ class Agent:
         if context is not None:
             instructions = instructions.format(**context)
 
+        try:
+            tools = {tool_name: tools_registry[tool_name] for tool_name in tool_names}
+        except KeyError as e:
+            raise RuntimeError(f"Tool {e} in Agent:{name} config doesn't exist.")
+
         return cls(
             name=name,
             model=model,
             description=description,
             instructions=instructions,
-            tool_names=tools,
-            tools_registry=tools_registry,
+            tools=tools,
+            provider=provider,
         )

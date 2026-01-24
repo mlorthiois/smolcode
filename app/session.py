@@ -4,8 +4,8 @@ from typing import cast, get_args
 
 from app.agent import Agent
 from app.context import Context
-from app.provider import Provider
 from app.registry import AgentName, Registry
+from app.subagent import SubAgentTool
 from app.schemas import (
     Message,
     UserInputResult,
@@ -26,15 +26,15 @@ from app.ui import (
 
 @dataclass
 class Session:
-    agent: AgentName
-    provider: Provider
+    current_agent_name: AgentName
+    registry: Registry
     context: Context = field(default_factory=Context)
 
     def get_agent(self) -> Agent:
-        return Registry.agents()[self.agent]
+        return self.registry.agents[self.current_agent_name]
 
     @ui_user_input
-    @ui_prompt(lambda self: PromptEvent(agent_name=self.agent.title()))
+    @ui_prompt(lambda self: PromptEvent(agent_name=self.current_agent_name.title()))
     def get_user_input(self) -> UserInputResult:
         user_input = input().strip()
 
@@ -49,14 +49,14 @@ class Session:
                 )
 
             agent_name = user_input_splitted[1].lower()
-            if agent_name == self.agent:
+            if agent_name == self.current_agent_name:
                 return UserInputResult(action="nothing")
 
             if agent_name not in get_args(AgentName):
                 raise RuntimeError(
                     f"{agent_name} not a valid agent. Pick from {get_args(AgentName)} and follow this strict format: `/agent {{agent_name}}`"
                 )
-            self.agent = cast("AgentName", agent_name)
+            self.current_agent_name = cast("AgentName", agent_name)
             return UserInputResult(action="switch_agent", feedback="Agent switched")
 
         if user_input in ("/q", "/quit", "exit"):
@@ -82,8 +82,8 @@ class Session:
                 .parameters["properties"]["skill_name"]["enum"]
             ),
             tools=tuple(tool.name for tool in self.get_agent().tools_schema),
-            auth=self.provider.auth.mode,
-            subagents=tuple(Registry.subagents().keys()),
+            auth=self.registry.provider.auth.mode,
+            subagents=tuple(self.registry.subagents.keys()),
         )
     )
     def start_multiturn_loop(self) -> None:
@@ -92,7 +92,7 @@ class Session:
                 user_input_result = self.get_user_input()
                 if user_input_result.action != "conversation":
                     continue
-                self.get_agent().run(self.context, self.provider)
+                self.get_agent().run(self.context)
 
             except (KeyboardInterrupt, EOFError):
                 require_ui().newline()

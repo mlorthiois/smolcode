@@ -49,12 +49,6 @@ from .login import LoginFlow
 from .oauth_token import DEFAULT_ORIGINATOR, TokenManager, Tokens
 
 
-class OAuthNotLoggedInError(Exception):
-    """Raised when OAuth is enabled but no valid token exists."""
-
-    pass
-
-
 OPENAI_API_URL = "https://api.openai.com/v1/responses"
 CODEX_API_URL = "https://chatgpt.com/backend-api/codex/responses"
 DEFAULT_HOME = Path("~/.config/smolcode").expanduser()
@@ -81,7 +75,7 @@ class AuthContext:
                     base_url=CODEX_API_URL,
                     token_manager=manager,
                 )
-            raise OAuthNotLoggedInError(
+            raise RuntimeError(
                 "OAuth is enabled but no valid token was found. "
                 "Run `smolcode login` to authenticate, then rerun the command."
             )

@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Self
 
-from app.registry import Registry
+from app.config import iter_config_files
 from app.schemas import ToolSchema
 from app.tool import Tool
 from app.utils.markdown import MarkdownFrontmatter
@@ -32,8 +32,23 @@ class SkillsTool(Tool):
     description = skills_description
     args = {"skill_name": "string"}
 
+    def __init__(self, skills: dict[str, Skill] | None = None) -> None:
+        self._skills = skills
+
+    @classmethod
+    def compile(cls, **kwargs) -> "SkillsTool":
+        return cls()
+
+    def _load_skills(self) -> dict[str, Skill]:
+        if self._skills is None:
+            self._skills = {}
+            for skill_file in iter_config_files("skills", "*/SKILL.md"):
+                skill = Skill.from_file(skill_file)
+                self._skills[skill.name] = skill
+        return self._skills
+
     def _build_description(self) -> str:
-        skills = Registry.skills()
+        skills = self._load_skills()
         return skills_description.format(
             skills="".join(
                 [
@@ -44,7 +59,7 @@ class SkillsTool(Tool):
         )
 
     def make_schema(self, name: str) -> ToolSchema:
-        skills = Registry.skills()
+        skills = self._load_skills()
         return ToolSchema(
             name=name,
             description=self._build_description(),
@@ -67,7 +82,7 @@ class SkillsTool(Tool):
         except KeyError:
             return "error: missing skill_name."
 
-        skills = Registry.skills()
+        skills = self._load_skills()
 
         try:
             return skills[skill_name].content

@@ -1,7 +1,8 @@
 import sys
 
 from app.provider import Provider
-from app.provider.auth import AuthContext, OAuthNotLoggedInError
+from app.provider.auth import AuthContext
+from app.registry import Registry
 from app.session import Session
 from app.ui import RED, RESET
 
@@ -13,12 +14,14 @@ def main():
 
     try:
         auth = AuthContext.from_environment()
-    except OAuthNotLoggedInError as e:
+        provider = Provider(auth)
+        registry = Registry(provider)
+    except Exception as e:
+        print(f"{RED}Error initiating session.{RESET}", file=sys.stderr)
         print(f"{RED}{e}{RESET}", file=sys.stderr)
         sys.exit(1)
 
-    provider = Provider(auth)
-    session = Session(agent="plan", provider=provider)
+    session = Session(current_agent_name="plan", registry=registry)
     session.start()
 
 
