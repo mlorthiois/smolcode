@@ -12,9 +12,10 @@ from typing import ParamSpec, Protocol, Self, TextIO, TypeVar
 
 from app.schemas import FunctionCall, FunctionCallOutput, UserInputResult
 
-RESET, BOLD, DIM, BLUE, CYAN, GREEN, YELLOW, RED = (
+RESET, BOLD, ITALIC, DIM, BLUE, CYAN, GREEN, YELLOW, RED = (
     "\033[0m",
     "\033[1m",
+    "\033[3m",
     "\033[2m",
     "\033[34m",
     "\033[36m",
@@ -235,7 +236,45 @@ class TerminalUI:
         self._out.write(text)
 
     def render_markdown(self, text: str) -> str:
-        return re.sub(r"\*\*(.+?)\*\*", f"{BOLD}\\1{RESET}", text)
+        def apply_inline_styles(line: str) -> str:
+            code_spans: list[str] = []
+
+            def stash_code(match: re.Match[str]) -> str:
+                code_spans.append(match.group(1))
+                return f"\0CODE{len(code_spans) - 1}\0"
+
+            line = re.sub(r"`([^`]+)`", stash_code, line)
+            line = re.sub(r"\*\*(.+?)\*\*", f"{BOLD}\\1{RESET}", line)
+            line = re.sub(
+                r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)",
+                f"{ITALIC}\\1{RESET}",
+                line,
+            )
+            line = re.sub(
+                r"(?<!_)_(?!_)(.+?)(?<!_)_(?!_)",
+                f"{ITALIC}\\1{RESET}",
+                line,
+            )
+
+            for index, code in enumerate(code_spans):
+                placeholder = f"\0CODE{index}\0"
+                line = line.replace(placeholder, f"{YELLOW}{code}{RESET}")
+
+            return line
+
+        rendered_lines: list[str] = []
+        for line in text.split("\n"):
+            match = re.match(r"^(#{1,6})\s+(.*)$", line)
+            if match:
+                level = len(match.group(1))
+                title_text = apply_inline_styles(match.group(2))
+                color = BLUE if level == 1 else CYAN if level == 2 else GREEN
+                rendered_lines.append(f"{BOLD}{color}{title_text}{RESET}")
+                continue
+
+            rendered_lines.append(apply_inline_styles(line))
+
+        return "\n".join(rendered_lines)
 
     def error(self, event: TextEvent) -> None:
         self.print(f"{RED}⏺ Error: {event.text}{RESET}\n")
