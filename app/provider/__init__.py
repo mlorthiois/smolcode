@@ -5,7 +5,7 @@ from typing import Any
 from urllib import error as urllib_error
 
 from app.context import Context
-from app.schemas import ToolSchema
+from app.utils.schemas import ToolSchema
 
 from .auth import AuthContext
 

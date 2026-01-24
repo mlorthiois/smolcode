@@ -1,8 +1,8 @@
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from app.schemas import FunctionCall, FunctionCallOutput, Input, Message
-from app.ui import (
+from app.utils.schemas import FunctionCall, FunctionCallOutput, Input, Message
+from app.utils.ui import (
     ui_text,
     ui_tool_extract,
     ui_tool_result,

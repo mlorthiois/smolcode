@@ -2,10 +2,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Self, TypedDict
 
-from app.config import iter_config_files
-from app.schemas import ToolSchema
 from app.tool import Tool
+from app.utils.config import iter_config_files
 from app.utils.markdown import MarkdownFrontmatter
+from app.utils.schemas import ToolSchema
 
 
 @dataclass

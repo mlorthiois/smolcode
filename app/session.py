@@ -4,12 +4,12 @@ from typing import cast, get_args
 
 from app.agent import Agent
 from app.context import Context
-from app.registry import AgentName, Registry
-from app.schemas import (
+from app.utils.registry import AgentName, Registry
+from app.utils.schemas import (
     Message,
     UserInputResult,
 )
-from app.ui import (
+from app.utils.ui import (
     HeaderEvent,
     PromptEvent,
     TerminalUI,

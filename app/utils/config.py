@@ -3,7 +3,7 @@ from pathlib import Path
 
 
 def config_roots() -> list[Path]:
-    project_root = Path(__file__).resolve().parent.parent
+    project_root = Path(__file__).resolve().parent.parent.parent
     repo_config = project_root / "config"
     xdg_config_home = os.environ.get("XDG_CONFIG_HOME")
     if xdg_config_home:

@@ -6,7 +6,7 @@ requires-python = "==3.13.*"
 dependencies = []
 
 [project.scripts]
-smolcode = "app.main:main"
+smolcode = "app:main"
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]

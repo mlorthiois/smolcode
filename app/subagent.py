@@ -3,9 +3,9 @@ from typing import TypedDict
 
 from app.agent import Agent
 from app.context import Context
-from app.schemas import Input, Message, ToolSchema
 from app.tool import Tool
-from app.ui import pop_depth, push_depth
+from app.utils.schemas import Input, Message, ToolSchema
+from app.utils.ui import pop_depth, push_depth
 
 subagent_description = """\
 Delegate a focused subtask to a specialized autonomous subagent. The subagent runs independently and returns a summary of its work.

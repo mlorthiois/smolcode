@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from functools import wraps
 from typing import ParamSpec, Protocol, Self, TextIO, TypeVar
 
-from app.schemas import FunctionCall, FunctionCallOutput, UserInputResult
+from app.utils.schemas import FunctionCall, FunctionCallOutput, UserInputResult
 
 RESET, BOLD, ITALIC, DIM, BLUE, CYAN, GREEN, YELLOW, RED = (
     "\033[0m",

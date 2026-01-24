@@ -6,10 +6,10 @@ from typing import Self
 
 from app.context import Context
 from app.provider import Provider
-from app.schemas import FunctionCall, FunctionCallOutput, Message, ToolSchema
 from app.tool import ToolAny
-from app.ui import require_ui
 from app.utils.markdown import MarkdownFrontmatter, parse_list
+from app.utils.schemas import FunctionCall, FunctionCallOutput, Message, ToolSchema
+from app.utils.ui import require_ui
 
 
 @dataclass

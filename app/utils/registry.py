@@ -2,7 +2,6 @@ import os
 from typing import Literal, cast
 
 from app.agent import Agent
-from app.config import config_file, iter_config_files
 from app.provider import Provider
 from app.subagent import SubAgentTool
 from app.tool import ToolAny
@@ -16,6 +15,7 @@ from app.tools import (
     WebFetchTool,
     WriteTool,
 )
+from app.utils.config import config_file, iter_config_files
 
 AgentName = Literal["build", "plan"]
 

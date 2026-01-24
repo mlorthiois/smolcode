@@ -11,7 +11,7 @@ from typing import (
     get_type_hints,
 )
 
-from app.schemas import ToolSchema
+from app.utils.schemas import ToolSchema
 
 
 def _unwrap_not_required(t: object) -> object:
