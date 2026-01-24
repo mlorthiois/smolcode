@@ -1,11 +1,19 @@
+from typing import NotRequired, TypedDict
+
 from app.tool import Tool
 
 
-class ReadTool(Tool):
-    description = "Read file with line numbers (file path, not directory)"
-    args = {"path": "string", "offset": "number?", "limit": "number?"}
+class Args(TypedDict):
+    path: str
+    offset: NotRequired[int]
+    limit: NotRequired[int]
 
-    def __call__(self, args):
+
+class ReadTool(Tool[Args]):
+    description = "Read file with line numbers (file path, not directory)"
+    args_type = Args
+
+    def __call__(self, args: Args):
         with open(args["path"]) as fd:
             lines = fd.readlines()
 

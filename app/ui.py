@@ -216,7 +216,7 @@ class NestedRenderer(Renderer):
 # -------------------------------------------------------------------------
 class TerminalUI:
     def __init__(self, out: TextIO | None = None) -> None:
-        self._out = out if out is not None else sys.stdout
+        self.out = out if out is not None else sys.stdout
         self._renderer_stack: list[Renderer] = [DefaultRenderer(self)]
 
     def _current_renderer(self) -> Renderer:
@@ -229,15 +229,15 @@ class TerminalUI:
         if len(self._renderer_stack) > 1:
             self._renderer_stack.pop()
 
-    def _terminal_width(self, out: TextIO) -> int:
+    def _terminal_width(self) -> int:
         size = shutil.get_terminal_size(fallback=(100, 20))
         return min(size.columns, 100)
 
-    def _separator(self, out: TextIO) -> str:
-        return f"{DIM}{'─' * self._terminal_width(out)}{RESET}"
+    def _separator(self) -> str:
+        return f"{DIM}{'─' * self._terminal_width()}{RESET}"
 
     def print(self, text: str) -> None:
-        self._out.write(text)
+        self.out.write(text)
 
     def render_markdown(self, text: str) -> str:
         def apply_inline_styles(line: str) -> str:
@@ -287,7 +287,7 @@ class TerminalUI:
         self._current_renderer().newline()
 
     def separator_line(self) -> None:
-        self.print(self._separator(self._out) + "\n")
+        self.print(self._separator() + "\n")
 
     def _clear_screen_if_tty(self, out: TextIO) -> None:
         if not out.isatty():
@@ -295,7 +295,7 @@ class TerminalUI:
         self.print("\033[2J\033[H")
 
     def header(self, event: HeaderEvent) -> None:
-        self._clear_screen_if_tty(self._out)
+        self._clear_screen_if_tty(self.out)
         self.separator_line()
         self.separator_line()
 
@@ -314,9 +314,9 @@ class TerminalUI:
         self.separator_line()
 
     def prompt(self, event: PromptEvent) -> None:
-        self.print(self._separator(self._out) + "\n")
+        self.print(self._separator() + "\n")
         self.print(f"{BOLD}{BLUE}({event.agent_name}) ❯{RESET} ")
-        self._out.flush()
+        self.out.flush()
 
     def text(self, event: TextEvent) -> None:
         self._current_renderer().text(event)
@@ -334,46 +334,46 @@ class TerminalUI:
 # -------------------------------------------------------------------------
 # TUI API
 # -------------------------------------------------------------------------
-_UI: TerminalUI | None = None
+_ui: TerminalUI | None = None
 
 
 def require_ui() -> TerminalUI:
-    if _UI is None:
+    if _ui is None:
         raise RuntimeError("UI not initialized (did you call Session.start()?)")
-    return _UI
+    return _ui
 
 
 def set_ui(ui: TerminalUI) -> None:
-    global _UI
-    _UI = ui
+    global _ui
+    _ui = ui
 
 
 def clear_ui() -> None:
-    global _UI
-    _UI = None
+    global _ui
+    _ui = None
 
 
 # -------------------------------------------------------------------------
 # Depth management (delegates to renderer stack)
 # -------------------------------------------------------------------------
-_DEPTH: int = 0
+_depth: int = 0
 
 
 def push_depth() -> None:
-    global _DEPTH
-    _DEPTH += 1
+    global _depth
+    _depth += 1
     ui = require_ui()
-    ui.push_renderer(NestedRenderer(ui, _DEPTH))
+    ui.push_renderer(NestedRenderer(ui, _depth))
 
 
 def pop_depth() -> None:
-    global _DEPTH
-    _DEPTH = max(0, _DEPTH - 1)
+    global _depth
+    _depth = max(0, _depth - 1)
     require_ui().pop_renderer()
 
 
 def get_depth() -> int:
-    return _DEPTH
+    return _depth
 
 
 # -------------------------------------------------------------------------

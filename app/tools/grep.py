@@ -1,17 +1,23 @@
 import re
 from pathlib import Path
+from typing import NotRequired, TypedDict
 
 from app.tool import Tool
 
 
-class GrepTool(Tool):
-    description = "Search files for regex pattern"
-    args = {"pat": "string", "path": "string?"}
+class Args(TypedDict):
+    pat: str
+    path: NotRequired[str]
 
-    def __call__(self, args):
+
+class GrepTool(Tool[Args]):
+    description = "Search files for regex pattern"
+    args_type = Args
+
+    def __call__(self, args: Args):
         pattern = re.compile(args["pat"])
 
-        hits = []
+        hits: list[str] = []
 
         for p in Path(args.get("path", ".")).glob("**"):
             if p.is_dir():

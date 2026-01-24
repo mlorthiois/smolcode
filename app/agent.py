@@ -1,12 +1,13 @@
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterator, Self
+from typing import Self
 
 from app.context import Context
 from app.provider import Provider
 from app.schemas import FunctionCall, FunctionCallOutput, Message, ToolSchema
-from app.tool import Tool
+from app.tool import ToolAny
 from app.ui import require_ui
 from app.utils.markdown import MarkdownFrontmatter, parse_list
 
@@ -16,19 +17,17 @@ class Agent:
     provider: Provider
     model: str
     instructions: str
-    tools: dict[str, Tool] = field(default_factory=dict)
+    tools: dict[str, ToolAny] = field(default_factory=dict)
+    tools_schema: list[ToolSchema] = field(default_factory=list)
     name: str = ""
     description: str = ""
-    tools_registry: dict[str, Tool] | None = None
+    tools_registry: dict[str, ToolAny] | None = None
 
     def __post_init__(self):
-        self.tools_schema: list[ToolSchema] = []
         for name, tool in self.tools.items():
             self.tools_schema.append(tool.make_schema(name))
 
     def _call(self, context: Context):
-        if self.provider is None:
-            raise RuntimeError("Provider is not configured.")
         return self.provider.call(
             context,
             self.model,
@@ -100,7 +99,7 @@ class Agent:
         path: Path,
         *,
         provider: Provider,
-        tools_registry: dict[str, Tool],
+        tools_registry: dict[str, ToolAny],
         base_instructions: str = "",
         context: dict[str, str] | None = None,
     ) -> Self:

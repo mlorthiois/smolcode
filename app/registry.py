@@ -1,26 +1,21 @@
-from __future__ import annotations
-from app.subagent import SubAgentTool
-
 import os
-from typing import TYPE_CHECKING, Literal, cast
+from typing import Literal, cast
 
-from app.config import config_file, iter_config_files
 from app.agent import Agent
-from app.tool import Tool
+from app.config import config_file, iter_config_files
+from app.provider import Provider
+from app.subagent import SubAgentTool
+from app.tool import ToolAny
 from app.tools import (
-    ReadTool,
-    GlobTool,
-    GrepTool,
     BashTool,
     EditTool,
-    WriteTool,
-    WebFetchTool,
+    GlobTool,
+    GrepTool,
+    ReadTool,
     SkillsTool,
+    WebFetchTool,
+    WriteTool,
 )
-
-if TYPE_CHECKING:
-    from app.provider import Provider
-
 
 AgentName = Literal["build", "plan"]
 
@@ -28,11 +23,11 @@ AgentName = Literal["build", "plan"]
 class Registry:
     def __init__(self, provider: Provider) -> None:
         self.provider = provider
-        self.tools: dict[str, Tool] = self._load_tools()
+        self.tools: dict[str, ToolAny] = self._load_tools()
         self.subagents: dict[str, Agent] = self._load_subagents()
         self.agents: dict[AgentName, Agent] = self._load_agents()
 
-    def _load_tools(self) -> dict[str, Tool]:
+    def _load_tools(self) -> dict[str, ToolAny]:
         return {
             "read": ReadTool(),
             "glob": GlobTool(),
@@ -45,7 +40,7 @@ class Registry:
         }
 
     def _load_subagents(self) -> dict[str, Agent]:
-        subagents = {}
+        subagents: dict[str, Agent] = {}
         context = {"path": os.getcwd()}
         for subagent_file in iter_config_files("subagents", "*/SUBAGENT.md"):
             subagent = Agent.from_file(

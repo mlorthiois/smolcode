@@ -1,8 +1,9 @@
 from dataclasses import dataclass
+from typing import TypedDict
 
 from app.agent import Agent
 from app.context import Context
-from app.schemas import Message, ToolSchema
+from app.schemas import Input, Message, ToolSchema
 from app.tool import Tool
 from app.ui import pop_depth, push_depth
 
@@ -12,13 +13,18 @@ Delegate a focused subtask to a specialized autonomous subagent. The subagent ru
 """
 
 
+class Args(TypedDict):
+    subagent_name: str
+    task: str
+
+
 @dataclass
-class SubAgentTool(Tool):
+class SubAgentTool(Tool[Args]):
     """Tool that delegates a task to a specialized subagent."""
 
     subagents: dict[str, Agent]
     description = subagent_description
-    args = {"subagent_name": "string", "task": "string"}
+    args_type = Args
 
     def _build_description(self) -> str:
         return subagent_description.format(
@@ -28,7 +34,7 @@ class SubAgentTool(Tool):
             )
         )
 
-    def _extract_last_assistant_message(self, ctx: list) -> str:
+    def _extract_last_assistant_message(self, ctx: list[Input]) -> str:
         """Extract the last assistant message from context as summary."""
         for item in reversed(ctx):
             if isinstance(item, Message) and item.role == "assistant":
@@ -56,7 +62,7 @@ class SubAgentTool(Tool):
             },
         )
 
-    def __call__(self, args: dict) -> str:
+    def __call__(self, args: Args) -> str:
         subagents = self.subagents
         subagent_name = args["subagent_name"]
         task = args["task"]

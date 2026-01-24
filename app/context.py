@@ -1,11 +1,7 @@
 from dataclasses import asdict, dataclass
 from typing import Any
 
-from app.schemas import (
-    FunctionCall,
-    FunctionCallOutput,
-    Message,
-)
+from app.schemas import FunctionCall, FunctionCallOutput, Input, Message
 from app.ui import (
     ui_text,
     ui_tool_extract,
@@ -14,7 +10,7 @@ from app.ui import (
 
 
 @dataclass
-class Context(list):
+class Context(list[Input]):
     def add_user_message(self, message: Message) -> str:
         self.append(message)
         return message.content

@@ -7,17 +7,14 @@ from __future__ import annotations
 
 import difflib
 import json
-import os
 import re
+from collections.abc import Generator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import (
     Callable,
-    Dict,
-    Generator,
-    List,
-    Optional,
-    Tuple,
+    NotRequired,
+    TypedDict,
 )
 
 from app.tool import Tool
@@ -50,7 +47,7 @@ def create_two_files_patch(file_path: str, old_text: str, new_text: str) -> str:
     return "\n".join(diff_iter)
 
 
-def count_line_additions_deletions(old_text: str, new_text: str) -> Tuple[int, int]:
+def count_line_additions_deletions(old_text: str, new_text: str) -> tuple[int, int]:
     """
     Rough equivalent of diff.diffLines(...) counts (line-based).
     """
@@ -76,7 +73,7 @@ def levenshtein(a: str, b: str) -> int:
 
     rows = len(a) + 1
     cols = len(b) + 1
-    matrix: List[List[int]] = [[0] * cols for _ in range(rows)]
+    matrix: list[list[int]] = [[0] * cols for _ in range(rows)]
 
     for i in range(rows):
         matrix[i][0] = i
@@ -145,7 +142,7 @@ def block_anchor_replacer(content: str, find: str) -> Generator[str, None, None]
     last_line_search = search_lines[-1].strip()
     search_block_size = len(search_lines)
 
-    candidates: List[Dict[str, int]] = []
+    candidates: list[dict[str, int]] = []
     for i in range(len(original_lines)):
         if original_lines[i].strip() != first_line_search:
             continue
@@ -192,7 +189,7 @@ def block_anchor_replacer(content: str, find: str) -> Generator[str, None, None]
             yield from emit_block(start_line, end_line)
         return
 
-    best_match: Optional[Dict[str, int]] = None
+    best_match: dict[str, int] | None = None
     max_similarity = -1.0
 
     for cand in candidates:
@@ -413,7 +410,7 @@ def trim_diff(diff_text: str) -> str:
     if min_indent == float("inf") or min_indent == 0:
         return diff_text
 
-    trimmed_lines: List[str] = []
+    trimmed_lines: list[str] = []
     for line in lines:
         if (
             (line.startswith("+") or line.startswith("-") or line.startswith(" "))
@@ -480,17 +477,6 @@ class EditResult:
     diff: str
     additions: int
     deletions: int
-
-
-def _safe_resolve(root_dir: str, rel_path: str) -> str:
-    # Resolve path inside root_dir and prevent path traversal
-    root_abs = os.path.abspath(root_dir)
-    target_abs = os.path.abspath(os.path.join(root_abs, rel_path))
-
-    if os.path.commonpath([root_abs, target_abs]) != root_abs:
-        raise ValueError("Path escapes workspace root")
-
-    return target_abs
 
 
 def edit_file_tool(
@@ -563,21 +549,26 @@ Usage:
 """
 
 
-class EditTool(Tool):
-    description = description
-    args = {
-        "filepath": "string",
-        "old_string": "string",
-        "new_string": "string",
-        "replace_all": "boolean?",
-    }
+class Args(TypedDict):
+    filepath: str
+    old_string: str
+    new_string: str
+    replace_all: NotRequired[bool]
 
-    def __call__(self, args):
+
+class EditTool(Tool[Args]):
+    description = description
+    args_type = Args
+
+    def __call__(self, args: Args):
         filepath = args["filepath"]
         old_string = args["old_string"]
         new_string = args["new_string"]
-        replace_all = args["replace_all"] if "replace_all" in args else False
+        replace_all = args.get("replace_all", False)
         output = edit_file_tool(
-            path=filepath, old=old_string, new=new_string, replace_all=replace_all
+            path=filepath,
+            old=old_string,
+            new=new_string,
+            replace_all=replace_all,
         )
         return output

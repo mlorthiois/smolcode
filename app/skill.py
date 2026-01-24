@@ -1,6 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Self
+from typing import Self, TypedDict
 
 from app.config import iter_config_files
 from app.schemas import ToolSchema
@@ -28,27 +28,23 @@ Load a skill to get detailed instructions for a specific task. Skills provide sp
 """
 
 
-class SkillsTool(Tool):
+class Args(TypedDict):
+    skill_name: str
+
+
+@dataclass
+class SkillsTool(Tool[Args]):
+    skills: dict[str, Skill] = field(default_factory=dict)
     description = skills_description
-    args = {"skill_name": "string"}
+    args_type = Args
 
-    def __init__(self, skills: dict[str, Skill] | None = None) -> None:
-        self._skills = skills
-
-    @classmethod
-    def compile(cls, **kwargs) -> "SkillsTool":
-        return cls()
-
-    def _load_skills(self) -> dict[str, Skill]:
-        if self._skills is None:
-            self._skills = {}
-            for skill_file in iter_config_files("skills", "*/SKILL.md"):
-                skill = Skill.from_file(skill_file)
-                self._skills[skill.name] = skill
-        return self._skills
+    def __post_init__(self):
+        for skill_file in iter_config_files("skills", "*/SKILL.md"):
+            skill = Skill.from_file(skill_file)
+            self.skills[skill.name] = skill
 
     def _build_description(self) -> str:
-        skills = self._load_skills()
+        skills = self.skills
         return skills_description.format(
             skills="".join(
                 [
@@ -59,7 +55,7 @@ class SkillsTool(Tool):
         )
 
     def make_schema(self, name: str) -> ToolSchema:
-        skills = self._load_skills()
+        skills = self.skills
         return ToolSchema(
             name=name,
             description=self._build_description(),
@@ -76,15 +72,13 @@ class SkillsTool(Tool):
             },
         )
 
-    def __call__(self, args) -> str:
+    def __call__(self, args: Args) -> str:
         try:
             skill_name = args["skill_name"]
         except KeyError:
             return "error: missing skill_name."
 
-        skills = self._load_skills()
-
         try:
-            return skills[skill_name].content
+            return self.skills[skill_name].content
         except KeyError:
             return f"error: skill {skill_name} not found."

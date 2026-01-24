@@ -1,4 +1,5 @@
 import urllib.request
+from typing import TypedDict
 
 from app.tool import Tool
 
@@ -12,11 +13,15 @@ description = """\
 """
 
 
-class WebFetchTool(Tool):
-    description = description
-    args = {"url": "string"}
+class Args(TypedDict):
+    url: str
 
-    def __call__(self, args):
+
+class WebFetchTool(Tool[Args]):
+    description = description
+    args_type = Args
+
+    def __call__(self, args: Args):
         url = args["url"]
         req = urllib.request.Request(url, method="GET")
 

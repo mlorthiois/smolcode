@@ -5,7 +5,6 @@ from typing import cast, get_args
 from app.agent import Agent
 from app.context import Context
 from app.registry import AgentName, Registry
-from app.subagent import SubAgentTool
 from app.schemas import (
     Message,
     UserInputResult,
@@ -104,7 +103,7 @@ class Session:
 
     def start(self) -> None:
         ui = TerminalUI()
-        if not ui._out.isatty():
+        if not ui.out.isatty():
             raise RuntimeError("TTY required")
 
         set_ui(ui)

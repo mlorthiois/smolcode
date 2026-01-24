@@ -48,7 +48,6 @@ from typing import Literal
 from .login import LoginFlow
 from .oauth_token import DEFAULT_ORIGINATOR, TokenManager, Tokens
 
-
 OPENAI_API_URL = "https://api.openai.com/v1/responses"
 CODEX_API_URL = "https://chatgpt.com/backend-api/codex/responses"
 DEFAULT_HOME = Path("~/.config/smolcode").expanduser()

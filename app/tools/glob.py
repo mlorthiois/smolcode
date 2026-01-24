@@ -1,13 +1,19 @@
 from pathlib import Path
+from typing import NotRequired, TypedDict
 
 from app.tool import Tool
 
 
-class GlobTool(Tool):
-    description = "Find files by pattern, sorted by mtime"
-    args = {"pat": "string", "path": "string?"}
+class Args(TypedDict):
+    pat: str
+    path: NotRequired[str]
 
-    def __call__(self, args) -> str:
+
+class GlobTool(Tool[Args]):
+    description = "Find files by pattern, sorted by mtime"
+    args_type = Args
+
+    def __call__(self, args: Args) -> str:
         files = list(Path(args.get("path", ".")).glob(args["pat"]))
 
         if len(files) == 0:
