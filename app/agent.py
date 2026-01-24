@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import Iterator, Self
 
 from app.context import Context
-from app.tool import Tool
-from app.provider import call_api
+from app.provider import Provider
 from app.schemas import FunctionCall, FunctionCallOutput, Message, ToolSchema
+from app.tool import Tool
 from app.ui import require_ui
 from app.utils.markdown import MarkdownFrontmatter, parse_list
 
@@ -33,8 +33,8 @@ class Agent:
                 self.tools[name] = tool
                 self.tools_schema.append(tool.make_schema(name))
 
-    def _call(self, context: Context):
-        return call_api(
+    def _call(self, context: Context, provider: Provider):
+        return provider.call(
             context,
             self.model,
             self.instructions,
@@ -67,8 +67,10 @@ class Agent:
             is_success,
         )
 
-    def _turn(self, context: Context) -> Iterator[Message | FunctionCall]:
-        response = self._call(context)
+    def _turn(
+        self, context: Context, provider: Provider
+    ) -> Iterator[Message | FunctionCall]:
+        response = self._call(context, provider)
         for block in response["output"]:
             if block["type"] == "message":
                 yield self._extract_message(block)
@@ -78,10 +80,10 @@ class Agent:
                 yield self._extract_function_call(block)
                 continue
 
-    def run(self, context: Context) -> Context:
+    def run(self, context: Context, provider: Provider) -> Context:
         while True:
             has_tool = False
-            for block in self._turn(context):
+            for block in self._turn(context, provider):
                 if isinstance(block, Message):
                     context.add_assistant_message(block)
 
@@ -135,6 +137,3 @@ class Agent:
             tool_names=tools,
             tools_registry=tools_registry,
         )
-
-
-__all__ = ["Agent"]

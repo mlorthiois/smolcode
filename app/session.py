@@ -3,8 +3,9 @@ from dataclasses import dataclass, field
 from typing import cast, get_args
 
 from app.agent import Agent
-from app.registry import AgentName, Registry
 from app.context import Context
+from app.provider import Provider
+from app.registry import AgentName, Registry
 from app.schemas import (
     Message,
     UserInputResult,
@@ -26,6 +27,7 @@ from app.ui import (
 @dataclass
 class Session:
     agent: AgentName
+    provider: Provider
     context: Context = field(default_factory=Context)
 
     def get_agent(self) -> Agent:
@@ -80,6 +82,8 @@ class Session:
                 .parameters["properties"]["skill_name"]["enum"]
             ),
             tools=tuple(tool.name for tool in self.get_agent().tools_schema),
+            auth=self.provider.auth.mode,
+            subagents=tuple(Registry.subagents().keys()),
         )
     )
     def start_multiturn_loop(self) -> None:
@@ -88,7 +92,7 @@ class Session:
                 user_input_result = self.get_user_input()
                 if user_input_result.action != "conversation":
                     continue
-                self.get_agent().run(self.context)
+                self.get_agent().run(self.context, self.provider)
 
             except (KeyboardInterrupt, EOFError):
                 require_ui().newline()

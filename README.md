@@ -110,21 +110,37 @@ flowchart
 ## Requirements
 
 - Python >= 3.13 (see `pyproject.toml`)
-- An OpenAI API key exported as `OPENAI_API_KEY`
+- Authentication (one of the following):
+  - **API Key**: An OpenAI API key
+  - **OAuth**: A ChatGPT Plus/Pro subscription (uses the Codex API)
 
-## Run It
+## Usage
 
-1) Export your API key:
+smolcode supports two authentication modes:
+
+### Option 1: API Key Mode
+
+Use your OpenAI API key directly:
 
 ```bash
-export OPENAI_API_KEY="..."
-```
-
-2) Start the CLI:
-
-```bash
+export OPENAI_API_KEY="sk-..."
 make smolcode
 ```
+
+### Option 2: OAuth Mode (ChatGPT Plus/Pro)
+
+Use your ChatGPT subscription via OAuth:
+
+```bash
+# First, login (opens browser for authentication)
+make login
+
+# Then, run smolcode
+export SMOLCODE_OAUTH="true"
+make smolcode
+```
+
+The OAuth flow uses PKCE and stores tokens in `~/.config/smolcode/auth.json`.
 
 ### In-Session Commands
 

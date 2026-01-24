@@ -25,11 +25,13 @@ RESET, BOLD, ITALIC, DIM, BLUE, CYAN, GREEN, YELLOW, RED = (
 )
 
 HEADER = r"""
->                          | Dir:    {pwd}
-> ┏━┓┏┳┓┏━┓╻  ┏━╸┏━┓╺┳┓┏━╸ | Branch: {branch}
-> ┗━┓┃┃┃┃ ┃┃  ┃  ┃ ┃ ┃┃┣╸  | Model:  {model} 
-> ┗━┛╹ ╹┗━┛┗━╸┗━╸┗━┛╺┻┛┗━╸ | Tools:  {tools} 
->                          | Skills: {skills}
+>                          | Auth:      {auth}
+>                          | Dir:       {pwd}
+> ┏━┓┏┳┓┏━┓╻  ┏━╸┏━┓╺┳┓┏━╸ | Branch:    {branch}
+> ┗━┓┃┃┃┃ ┃┃  ┃  ┃ ┃ ┃┃┣╸  | Model:     {model} 
+> ┗━┛╹ ╹┗━┛┗━╸┗━╸┗━┛╺┻┛┗━╸ | Tools:     {tools} 
+>                          | Skills:    {skills}
+>                          | Subagents: {subagents}
 """.strip()
 
 P = ParamSpec("P")
@@ -44,6 +46,8 @@ class HeaderEvent:
     model: str
     skills: tuple[str, ...]
     tools: tuple[str, ...]
+    auth: str
+    subagents: tuple[str, ...]
     pwd: str = os.getcwd()
     branch: str = subprocess.run(
         ["git", "branch", "--show-current"], capture_output=True, text=True
@@ -302,6 +306,8 @@ class TerminalUI:
                 model=event.model,
                 tools=", ".join(event.tools),
                 skills=", ".join(event.skills),
+                auth=format_auth_mode(event.auth),
+                subagents=", ".join(event.subagents),
             )
             + "\n"
         )
@@ -454,3 +460,11 @@ def ui_tool_result(
         return result, is_success
 
     return wrapper
+
+
+def format_auth_mode(mode: str) -> str:
+    if mode == "oauth":
+        return "OAuth"
+    if mode == "api_key":
+        return "API key"
+    return mode

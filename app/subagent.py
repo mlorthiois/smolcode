@@ -4,7 +4,6 @@ from app.schemas import Message, ToolSchema
 from app.tool import Tool
 from app.ui import pop_depth, push_depth
 
-
 subagent_description = """\
 Delegate a focused subtask to a specialized autonomous subagent. The subagent runs independently and returns a summary of its work.
 <available_subagents>{subagents}</available_subagents>

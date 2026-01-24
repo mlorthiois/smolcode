@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, ClassVar, Literal, cast
 from app.agent import Agent
 from app.tool import Tool
 
-
 if TYPE_CHECKING:
     from app.skill import Skill
 
@@ -130,6 +129,3 @@ class Registry:
             }
             cls._tools = tools
         return cls._tools
-
-
-__all__ = ["AgentName", "Registry"]
