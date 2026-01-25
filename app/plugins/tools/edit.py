@@ -17,7 +17,7 @@ from typing import (
     TypedDict,
 )
 
-from app.tool import Tool
+from app.core import Tool
 
 MAX_DIAGNOSTICS_PER_FILE = 20
 

@@ -2,6 +2,12 @@ import os
 from pathlib import Path
 
 
+def truthy(value: str | None) -> bool:
+    if not value:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 def config_roots() -> list[Path]:
     project_root = Path(__file__).resolve().parent.parent.parent
     repo_config = project_root / "config"

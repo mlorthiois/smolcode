@@ -1,34 +1,44 @@
 import json
 import urllib.request
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from typing import Any
 from urllib import error as urllib_error
 
-from app.context import Context
-from app.utils.schemas import ToolSchema
+from app.core import ContextProtocol, ProviderProtocol, ToolSchema
+from app.core.provider import AuthMode
 
 from .auth import AuthContext
 
 
-class Provider:
-    def __init__(self, auth: AuthContext) -> None:
-        self.auth = auth
+@dataclass
+class Provider(ProviderProtocol):
+    auth: AuthContext
+
+    def auth_mode(self) -> AuthMode:
+        return self.auth.mode
 
     def call(
         self,
-        context: Context,
+        context: ContextProtocol,
         model: str,
-        system_prompt: str,
+        instructions: str,
         tools_schema: list[ToolSchema],
     ) -> dict[str, Any]:
-        body = self._build_request_body(
-            context=context,
-            model=model,
-            system_prompt=system_prompt,
-            tools_schema=tools_schema,
-        )
+        payload = json.dumps(
+            {
+                "model": model,
+                "instructions": instructions,
+                "input": context,
+                "tools": [asdict(schema) for schema in tools_schema],
+                "store": False,
+                "stream": True,
+                "reasoning": {"summary": "detailed"},
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        ).encode()
+
         headers = self.auth.request_headers()
-        payload = json.dumps(body).encode()
 
         request = urllib.request.Request(
             self.auth.get_base_url(),
@@ -62,27 +72,6 @@ class Provider:
             raise RuntimeError(
                 f"Provider request failed (status={exc.code}): {message}"
             ) from exc
-
-    def _build_request_body(
-        self,
-        *,
-        context: Context,
-        model: str,
-        system_prompt: str,
-        tools_schema: list[ToolSchema],
-    ) -> dict[str, Any]:
-        tools_schema_json = [asdict(schema) for schema in tools_schema]
-
-        body: dict[str, Any] = {
-            "model": model,
-            "instructions": system_prompt,
-            "input": context,
-            "tools": tools_schema_json,
-            "store": False,
-            "stream": True,
-            "reasoning": {"summary": "detailed"},
-        }
-        return body
 
     @staticmethod
     def _parse_streaming_response(raw: str) -> dict[str, Any]:

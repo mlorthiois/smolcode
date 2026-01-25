@@ -2,7 +2,7 @@ import re
 from pathlib import Path
 from typing import NotRequired, TypedDict
 
-from app.tool import Tool
+from app.core import Tool
 
 
 class Args(TypedDict):

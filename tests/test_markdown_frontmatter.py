@@ -1,6 +1,6 @@
 import unittest
 
-from app.utils.markdown import MarkdownFrontmatter, parse_list
+from app.utils.markdown import MarkdownFrontmatter
 
 
 class TestMarkdownFrontmatter(unittest.TestCase):
@@ -76,8 +76,9 @@ description: Trim body
         self.assertTrue(parsed.has_frontmatter)
 
     def test_parse_list(self) -> None:
-        self.assertEqual(parse_list("read, write ,  "), ["read", "write"])
-        self.assertEqual(parse_list(""), [])
+        pl = MarkdownFrontmatter.parse_list
+        self.assertEqual(pl("read, write ,  "), ["read", "write"])
+        self.assertEqual(pl(""), [])
 
 
 if __name__ == "__main__":

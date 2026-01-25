@@ -11,10 +11,9 @@ This document explains how AI coding agents (like Claude Code, OpenAI Codex CLI,
 2. [Core Components](#core-components)
 3. [The Agent Loop](#the-agent-loop)
 4. [Tools: Giving the AI Hands](#tools-giving-the-ai-hands)
-5. [The System Prompt: Shaping Behavior](#the-system-prompt-shaping-behavior)
-6. [Skills: Dynamic Instruction Loading](#skills-dynamic-instruction-loading)
-7. [Subagents: Delegated Work](#subagents-delegated-work)
-8. [Putting It All Together](#putting-it-all-together)
+    1. [Skills: Dynamic Instruction Loading](#skills-dynamic-instruction-loading)
+    2. [Subagents: Delegated Work](#subagents-delegated-work)
+5. [Putting It All Together](#putting-it-all-together)
 
 ---
 
@@ -55,7 +54,7 @@ The `Session` is the orchestrator. It manages:
 - The main loop that coordinates everything
 
 ```python
-# app/session.py (simplified)
+# app/backend/session.py (simplified)
 class Session:
     agent: AgentName
     context: Context  # Encapsulates conversation history
@@ -73,7 +72,7 @@ class Session:
 The `Messages` class encapsulates the conversation history:
 
 ```python
-# app/context.py (simplified)
+# app/backend/context.py (simplified)
 class Context: # Stores all messages, function calls, and outputs
     def add_user_message(self, message): ...
     def add_assistant(self, message): ...
@@ -89,7 +88,7 @@ The `Agent` wraps the LLM interaction. It holds:
 - Available tools and their schemas
 
 ```python
-# app/agent.py
+# app/backend/agent.py
 class Agent:
     model: str
     instructions: str
@@ -122,7 +121,7 @@ class Agent:
 The `Provider` handles the actual HTTP communication with the LLM API. Notice how simple this is—just a plain HTTP POST request using Python's built-in `urllib`. No SDK required:
 
 ```python
-# app/provider.py
+# app/backend/provider
 API_URL = "https://api.openai.com/v1/responses"
 
 def call_api(
@@ -211,7 +210,7 @@ Each tool has three parts:
 3. **Output**: Text result returned to the LLM
 
 ```python
-# app/tool.py
+# app/backend/tool.py
 @dataclass
 class Tool(ABC):
     description: ClassVar[str]
@@ -247,7 +246,7 @@ class Tool(ABC):
 ### Example: Read Tool
 
 ```python
-# app/tools/read.py
+# app/backend/tools/read.py
 class ReadTool(Tool):
     description = "Read file with line numbers (file path, not directory)"
     args = {"path": "string", "offset": "number?", "limit": "number?"}
@@ -264,21 +263,6 @@ class ReadTool(Tool):
         return "".join(
             f"{offset + idx + 1:4}| {line}" for idx, line in enumerate(selected)
         )
-```
-
-### Example: Bash Tool
-
-```python
-# app/tools/bash.py
-class BashTool(Tool):
-    description = "Run bash command"
-    args = {"cmd": "string"}
-
-    def __call__(self, args):
-        result = subprocess.run(
-            args["cmd"], shell=True, capture_output=True, text=True, timeout=30
-        )
-        return (result.stdout + result.stderr).strip() or "(No content)"
 ```
 
 ### The Tool Schema → LLM
@@ -312,45 +296,6 @@ The LLM sees this schema and can decide to call the tool by outputting:
   "arguments": "{\"path\": \"main.py\"}"
 }
 ```
-
----
-
-## The System Prompt: Shaping Behavior
-
-The system prompt (or "instructions") is crucial. It defines:
-- The agent's personality and communication style
-- How it should approach tasks
-- What guidelines to follow
-- How to present work to the user
-
-```python
-# app/agents/build.py
-instructions = """\
-You are an helpful agent.
-"""
-
-agent = Agent(
-    model="gpt-5.2",
-    instructions=instructions,
-    tools={
-        "read": ReadTool(),
-        "glob": GlobTool(),
-        "bash": BashTool(),
-        "grep": GrepTool(),
-        "edit": EditTool(),
-        "webfetch": WebFetchTool(),
-        "skills": SkillsTool(),
-    },
-)
-```
-
-A typical system prompt includes:
-
-1. **Role definition**: "You are a coding agent running in a terminal..."
-2. **Capabilities**: What the agent can do
-3. **Task execution guidelines**: "Keep going until the task is complete..."
-4. **Code style rules**: "Keep changes consistent with existing codebase..."
-5. **Output formatting**: How to present results
 
 ---
 
@@ -397,7 +342,7 @@ When reviewing code, focus on:
 The `SkillsTool` loads these dynamically:
 
 ```python
-# app/skill.py
+# app/backend/skill.py
 @dataclass
 class Skill:
     name: str

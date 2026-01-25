@@ -1,15 +1,16 @@
 from dataclasses import dataclass
 from typing import TypedDict, cast
 
-from app.agent import Agent
-from app.context import Context
-from app.tool import Tool
-from app.utils.schemas import Input, Block, ToolSchema, AssistantMessage, UserMessage
-from app.utils.ui import pop_depth, push_depth
+from app.backend.context import ContextFactory
+from app.core import Agent, Tool, ToolSchema
+from app.core.types import AssistantMessage, Block, Input, UserMessage
 
 subagent_description = """\
 Delegate a focused subtask to a specialized autonomous subagent. The subagent runs independently and returns a summary of its work.
-<available_subagents>{subagents}</available_subagents>
+
+<available_subagents>
+{subagents}
+</available_subagents>
 """
 
 
@@ -25,10 +26,11 @@ class SubAgentTool(Tool[Args]):
     subagents: dict[str, Agent]
     description = subagent_description
     args_type = Args
+    context_factory: ContextFactory
 
     def _build_description(self) -> str:
         return subagent_description.format(
-            subagents="".join(
+            subagents="\n".join(
                 f"<subagent><name>{s.name}</name><description>{s.description}</description></subagent>"
                 for s in self.subagents.values()
             )
@@ -78,15 +80,10 @@ class SubAgentTool(Tool[Args]):
 
         subagent = subagents[subagent_name]
 
-        # Execute with depth tracking for nested UI
-        push_depth()
-        try:
-            ctx = Context()
+        with self.context_factory.child() as ctx:
             ctx.add_user_message(UserMessage(role="user", content=task))
             subagent.run(ctx)
             summary = self._extract_last_assistant_message(ctx)
-        finally:
-            pop_depth()
 
         return summary
 

@@ -8,6 +8,10 @@ class MarkdownFrontmatter:
     body: str
     has_frontmatter: bool
 
+    @staticmethod
+    def parse_list(value: str) -> list[str]:
+        return [item.strip() for item in value.split(",") if item.strip()]
+
     @classmethod
     def from_file(cls, path: Path) -> "MarkdownFrontmatter":
         return cls.from_scratch(path.read_text())
@@ -54,7 +58,3 @@ class MarkdownFrontmatter:
             frontmatter["description"] = bare_lines[0]
 
         return frontmatter
-
-
-def parse_list(value: str) -> list[str]:
-    return [item.strip() for item in value.split(",") if item.strip()]

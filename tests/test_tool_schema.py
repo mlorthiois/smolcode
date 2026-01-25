@@ -1,7 +1,7 @@
 import unittest
 from typing import NotRequired, TypedDict, cast
 
-from app.tool import _schema_from_typed_dict
+from app.core.tool import Tool
 
 
 class Args(TypedDict):
@@ -13,7 +13,7 @@ class Args(TypedDict):
 
 class TestToolSchema(unittest.TestCase):
     def test_schema_respects_optional_keys(self) -> None:
-        schema = _schema_from_typed_dict(Args)
+        schema = Tool.schema_from_typed_dict(Args)
         properties = cast(dict[str, dict[str, object]], schema["properties"])
         required = cast(list[str], schema["required"])
 

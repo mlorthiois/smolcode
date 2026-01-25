@@ -1,7 +1,7 @@
 import subprocess
 from typing import TypedDict
 
-from app.tool import Tool
+from app.core import Tool
 
 
 class Args(TypedDict):

@@ -1,7 +1,7 @@
 import urllib.request
 from typing import TypedDict
 
-from app.tool import Tool
+from app.core import Tool
 
 MAX_BYTES: int = 1_000_000
 TIMEOUT_SEC: float = 10.0

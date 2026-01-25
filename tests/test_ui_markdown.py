@@ -1,6 +1,15 @@
 import unittest
 
-from app.utils.ui import BLUE, BOLD, CYAN, GREEN, ITALIC, RESET, YELLOW, TerminalUI
+from app.ui.terminal_ui import (
+    BLUE,
+    BOLD,
+    CYAN,
+    GREEN,
+    ITALIC,
+    RESET,
+    YELLOW,
+    TerminalUI,
+)
 
 
 class TestRenderMarkdown(unittest.TestCase):

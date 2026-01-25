@@ -11,3 +11,6 @@ smolcode-api:
 
 login:
 	@PYTHONPATH=$(PWD) uv run app/main.py login
+
+test:
+	uv run python -m unittest

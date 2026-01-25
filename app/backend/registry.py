@@ -1,31 +1,39 @@
 import os
+from dataclasses import dataclass, field
 from typing import Literal, cast
 
-from app.agent import Agent
-from app.provider import Provider
-from app.subagent import SubAgentTool
-from app.tool import ToolAny
-from app.tools import (
+from app.core import Agent, ProviderProtocol, ToolAny
+from app.plugins.tools import (
     BashTool,
     EditTool,
     GlobTool,
     GrepTool,
     ReadTool,
     SkillsTool,
+    SubAgentTool,
     WebFetchTool,
     WriteTool,
 )
 from app.utils.config import config_file, iter_config_files
 
+from .context import ContextFactory
+from .utils import build_agent_from_file
+
 AgentName = Literal["build", "plan"]
 
 
+@dataclass
 class Registry:
-    def __init__(self, provider: Provider) -> None:
-        self.provider = provider
-        self.tools: dict[str, ToolAny] = self._load_tools()
-        self.subagents: dict[str, Agent] = self._load_subagents()
-        self.agents: dict[AgentName, Agent] = self._load_agents()
+    provider: ProviderProtocol
+    context_factory: ContextFactory
+    tools: dict[str, ToolAny] = field(default_factory=dict)
+    subagents: dict[str, Agent] = field(default_factory=dict)
+    agents: dict[AgentName, Agent] = field(default_factory=dict)
+
+    def __post_init__(self):
+        self.tools = self._load_tools()
+        self.subagents = self._load_subagents()
+        self.agents = self._load_agents()
 
     def _load_tools(self) -> dict[str, ToolAny]:
         return {
@@ -43,7 +51,7 @@ class Registry:
         subagents: dict[str, Agent] = {}
         context = {"path": os.getcwd()}
         for subagent_file in iter_config_files("subagents", "*/SUBAGENT.md"):
-            subagent = Agent.from_file(
+            subagent = build_agent_from_file(
                 subagent_file,
                 context=context,
                 tools_registry=self.tools,
@@ -61,12 +69,15 @@ class Registry:
         context = {"path": os.getcwd()}
 
         for agent_file in iter_config_files("agents", "*/AGENT.md"):
-            agent = Agent.from_file(
+            agent = build_agent_from_file(
                 agent_file,
                 base_instructions=base_instructions,
                 context=context,
                 tools_registry={
-                    "subagent": SubAgentTool(subagents=self.subagents),
+                    "subagent": SubAgentTool(
+                        subagents=self.subagents,
+                        context_factory=self.context_factory,
+                    ),
                     **self.tools,
                 },
                 provider=self.provider,

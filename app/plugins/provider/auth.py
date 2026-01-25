@@ -43,7 +43,10 @@ Auth Selection Flow
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Self, cast
+
+from app.core.provider import AuthMode
+from app.utils.config import truthy
 
 from .login import LoginFlow
 from .oauth_token import DEFAULT_ORIGINATOR, TokenManager, Tokens
@@ -55,14 +58,14 @@ DEFAULT_HOME = Path("~/.config/smolcode").expanduser()
 
 @dataclass(slots=True)
 class AuthContext:
-    mode: Literal["oauth", "api_key"]
+    mode: AuthMode
     base_url: str
     api_key: str | None = None
     token_manager: TokenManager | None = None
 
     @classmethod
-    def from_environment(cls, home: Path = DEFAULT_HOME) -> "AuthContext":
-        use_oauth = _truthy(os.getenv("SMOLCODE_OAUTH"))
+    def from_environment(cls, home: Path = DEFAULT_HOME) -> Self:
+        use_oauth = truthy(os.getenv("SMOLCODE_OAUTH"))
         api_key = os.getenv("OPENAI_API_KEY")
 
         if use_oauth:
@@ -70,7 +73,7 @@ class AuthContext:
             tokens = manager.get_tokens()
             if tokens and tokens.access_token:
                 return cls(
-                    mode="oauth",
+                    mode=cast(AuthMode, "oauth"),
                     base_url=CODEX_API_URL,
                     token_manager=manager,
                 )
@@ -85,7 +88,7 @@ class AuthContext:
             )
 
         return cls(
-            mode="api_key",
+            mode=cast(AuthMode, "api_key"),
             base_url=OPENAI_API_URL,
             api_key=api_key,
         )
@@ -138,9 +141,3 @@ class AuthContext:
             originator=manager.originator,
         )
         return flow.run()
-
-
-def _truthy(value: str | None) -> bool:
-    if not value:
-        return False
-    return value.strip().lower() in {"1", "true", "yes", "on"}

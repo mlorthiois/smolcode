@@ -26,7 +26,7 @@ It runs a simple chat loop, lets the model call a small set of local tools (read
   - Run local shell commands
   - Apply safe, exact-text edits to files
 - Skills system: load task-specific instruction bundles (e.g. code review, python best practices) to steer behavior.
-- Lightweight UI rendering: shows tool calls and previews results while you work. Decorators only TUI.
+- Lightweight UI rendering: shows tool calls and previews results while you work.
 
 ## How The Repo Is Assembled
 
@@ -34,25 +34,15 @@ The project is intentionally small: one CLI entrypoint, one agent wrapper around
 
 ### Main Components
 
-- `app/main.py`: CLI entrypoint. Creates a `Session` and starts the loop.
-- `app/session.py`: Orchestrates the conversation:
-  - Collects user input
-  - Calls the agent
-  - Dispatches tool calls
-  - Appends tool outputs back into the message stream
-- `app/agent.py`: Defines the `Agent`:
-  - Loads base instructions from `config/agents/common.txt`
-  - Loads agent markdown from `config/agents/`
-  - Registers tools and exposes their JSON schemas to the model
-  - Calls the API via `app/provider.py`
+- `app/__init__.py`: CLI entrypoint. Creates a `Session` and starts the loop.
+- `app/backend/*`: Orchestrates the conversation:
+  - Collects user input, calls the agent, dispatches tool calls, appends tool outputs back into the message stream
+- `app/core/*`: Agent primitives described below
+- `app/plugins/*`: Usage of primitives: Tools, Skills, Subagents, OpenAI provider, ...
+- `app/ui/*`: Terminal output formatting and event sink.
 - `config/agents/`: Markdown agent definitions
 - `config/subagents/`: Worker agents used for delegated subtasks
-- `app/provider.py`: Thin client for the OpenAI Responses API (`/v1/responses`). Uses `OPENAI_API_KEY`.
-- `app/tools/`: Local tool implementations (and their JSON schemas)
-  - `read.py`, `glob.py`, `grep.py`, `bash.py`, `edit.py`
-- `config/skills/`: Markdown “skill” files + loader
-  - `Registry` scans `config/skills/*.md` and exposes them through a `skills` tool
-- `app/ui.py`: Terminal output formatting and decorators used by `Session`.
+- `app/ui/*`: Renderer of backend events
 
 ### Control Flow
 
@@ -85,26 +75,17 @@ sequenceDiagram
 ### Architecture (Modules)
 
 ```mermaid
-flowchart 
-  User --> session[Session]
-  session --> agent[Agent]
-  session --> context[Context]
-
-  agent --> api[LLM]
-  agent --> tools[Tools]
-  agent --> prompt[Instructions]
-  agent --> context
-
-  tools --> read[ReadTool]
-  tools --> edit[EditTool]
-  tools --> bash[BashTool]
-  tools --> ...
-  tools --> subagent[SubAgent]
-
-  subagent -->|delegate| agent
-
-  agent --> skillsTool[SkillsTool]
-  skillsTool --> Skill.md
+flowchart LR
+    User([User]) --> Session
+    Session --> Context
+    Session --> Agent
+    Agent --> Context
+    Agent --> LLM[(LLM API)]
+    LLM --> Agent
+    Agent --> Tools[Local Tools]
+    Tools --> Agent
+    Agent --> Session
+    Session --> User
 ```
 
 ## Requirements
