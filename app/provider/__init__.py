@@ -71,16 +71,16 @@ class Provider:
         system_prompt: str,
         tools_schema: list[ToolSchema],
     ) -> dict[str, Any]:
-        provider_input = context.to_provider_input()
         tools_schema_json = [asdict(schema) for schema in tools_schema]
 
         body: dict[str, Any] = {
             "model": model,
             "instructions": system_prompt,
-            "input": provider_input,
+            "input": context,
             "tools": tools_schema_json,
             "store": False,
             "stream": True,
+            "reasoning": {"summary": "detailed"},
         }
         return body
 

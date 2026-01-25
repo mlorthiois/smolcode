@@ -1,10 +1,10 @@
 from dataclasses import dataclass
-from typing import TypedDict
+from typing import TypedDict, cast
 
 from app.agent import Agent
 from app.context import Context
 from app.tool import Tool
-from app.utils.schemas import Input, Message, ToolSchema
+from app.utils.schemas import Input, Block, ToolSchema, AssistantMessage, UserMessage
 from app.utils.ui import pop_depth, push_depth
 
 subagent_description = """\
@@ -37,8 +37,14 @@ class SubAgentTool(Tool[Args]):
     def _extract_last_assistant_message(self, ctx: list[Input]) -> str:
         """Extract the last assistant message from context as summary."""
         for item in reversed(ctx):
-            if isinstance(item, Message) and item.role == "assistant":
-                return item.content
+            item = cast(Block, item)
+            if item["type"] != "message":
+                continue
+            item = cast(AssistantMessage | UserMessage, item)
+            if isinstance(item["content"], str):
+                continue
+            item = cast(AssistantMessage, item)
+            return item["content"][0]["text"]
         return "(No response from subagent)"
 
     def make_schema(self, name: str) -> ToolSchema:
@@ -76,7 +82,7 @@ class SubAgentTool(Tool[Args]):
         push_depth()
         try:
             ctx = Context()
-            ctx.add_user_message(Message(role="user", content=task))
+            ctx.add_user_message(UserMessage(role="user", content=task))
             subagent.run(ctx)
             summary = self._extract_last_assistant_message(ctx)
         finally:

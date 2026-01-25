@@ -24,6 +24,13 @@ RESET, BOLD, ITALIC, DIM, BLUE, CYAN, GREEN, YELLOW, RED = (
     "\033[31m",
 )
 
+
+def apply_base_style(text: str, style: str) -> str:
+    if not style:
+        return text
+    return f"{style}{text.replace(RESET, RESET + style)}{RESET}"
+
+
 HEADER = r"""
 >                          | Auth:      {auth}
 >                          | Dir:       {pwd}
@@ -62,6 +69,7 @@ class PromptEvent:
 @dataclass(frozen=True, slots=True)
 class TextEvent:
     text: str
+    kind: str = "assistant"
 
 
 @dataclass(frozen=True, slots=True)
@@ -72,9 +80,9 @@ class ToolCallEvent:
     @classmethod
     def from_function_call(cls, call: FunctionCall) -> Self:
         try:
-            parsed = json.loads(call.arguments)
+            parsed = json.loads(call["arguments"])
         except json.JSONDecodeError:
-            return cls(name=call.name, arg_preview="(invalid json)")
+            return cls(name=call["name"], arg_preview="(invalid json)")
 
         arg_preview = ""
         if isinstance(parsed, dict) and parsed:
@@ -83,7 +91,7 @@ class ToolCallEvent:
             if len(arg_preview) > 70:
                 arg_preview = arg_preview[:70]
 
-        return cls(name=call.name, arg_preview=arg_preview)
+        return cls(name=call["name"], arg_preview=arg_preview)
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,7 +104,7 @@ class ToolResultEvent:
     def from_function_call_output_and_success(
         cls, result: FunctionCallOutput | str, is_success: bool
     ) -> Self:
-        result_str = result.output if isinstance(result, FunctionCallOutput) else result
+        result_str = result if isinstance(result, str) else result["output"]
 
         result_lines = result_str.split("\n")
         preview: list[str] = []
@@ -104,7 +112,7 @@ class ToolResultEvent:
             if len(line) > 80:
                 line = line[:77] + "..."
             if len(line) == 0:
-                line = "(No content)"
+                line = ""
             preview.append(line)
 
         remaining_lines = max(len(result_lines) - 3, 0)
@@ -153,8 +161,15 @@ class DefaultRenderer(Renderer):
     """Standard renderer for primary agent output."""
 
     def text(self, event: TextEvent) -> None:
+        if len(event.text) == 0:
+            return
+        if event.kind == "reasoning":
+            rendered = apply_base_style(self.printer.render_markdown(event.text), DIM)
+            self.printer.print(f"{DIM}⏺{RESET} {rendered}\n")
+            return
+
         self.printer.print(
-            f"{CYAN}⏺{RESET} {self.printer.render_markdown(event.text)}\n"
+            f"{BLUE}⏺{RESET} {self.printer.render_markdown(event.text)}\n"
         )
 
     def tool_call(self, event: ToolCallEvent) -> None:
@@ -428,14 +443,17 @@ def ui_user_input(func: Callable[P, UserInputResult]) -> Callable[P, UserInputRe
     return wrapper
 
 
-def ui_text(func: Callable[P, str]) -> Callable[P, str]:
-    @wraps(func)
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> str:
-        text = func(*args, **kwargs)
-        require_ui().text(TextEvent(text))
-        return text
+def ui_text(*, kind: str) -> Callable[[Callable[P, str]], Callable[P, str]]:
+    def decorator(func: Callable[P, str]) -> Callable[P, str]:
+        @wraps(func)
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> str:
+            text = func(*args, **kwargs)
+            require_ui().text(TextEvent(text, kind=kind))
+            return text
 
-    return wrapper
+        return wrapper
+
+    return decorator
 
 
 def ui_tool_extract(func: Callable[P, FunctionCall]) -> Callable[P, FunctionCall]:
@@ -466,5 +484,5 @@ def format_auth_mode(mode: str) -> str:
     if mode == "oauth":
         return "OAuth"
     if mode == "api_key":
-        return "API key"
+        return "API"
     return mode

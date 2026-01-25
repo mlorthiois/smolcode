@@ -6,8 +6,8 @@ from app.agent import Agent
 from app.context import Context
 from app.utils.registry import AgentName, Registry
 from app.utils.schemas import (
-    Message,
     UserInputResult,
+    UserMessage,
 )
 from app.utils.ui import (
     HeaderEvent,
@@ -68,7 +68,7 @@ class Session:
         if user_input.startswith("/"):
             return UserInputResult(action="nothing")
 
-        self.context.add_user_message(Message(role="user", content=user_input))
+        self.context.add_user_message(UserMessage(role="user", content=user_input))
         return UserInputResult(action="conversation")
 
     @ui_header(
